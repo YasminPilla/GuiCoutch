@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { motion } from "framer-motion";
 import { Star } from "lucide-react";
 import t1 from "@/assets/transform-1.jpg";
@@ -12,11 +13,18 @@ const cases = [
 
 export function Results() {
   return (
-    <section id="resultados" className="relative py-32 px-6">
-      <div className="mx-auto max-w-7xl">
-        <div className="flex flex-wrap items-end justify-between gap-6 mb-16">
-          <div className="max-w-2xl">
-            <p className="text-xs uppercase tracking-widest text-neon mb-4">Prova social</p>
+    <section id="resultados" className="relative py-12 px-6">
+      <div className="mx-auto max-w-5xl">
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+          <div className="max-w-xl">
+            <p style={{
+              display: "inline-block",
+              fontSize: 13, fontWeight: 800,
+              letterSpacing: ".18em", textTransform: "uppercase",
+              color: "#00FF88", marginBottom: 12,
+              borderBottom: "1.5px solid rgba(0,255,136,0.35)",
+              paddingBottom: 4,
+            }}>Prova social</p>
             <h2 className="font-display text-4xl md:text-6xl font-bold leading-tight">
               Quem entra, evolui.<br />
               <span className="text-muted-foreground">E não volta a treinar sem método.</span>
@@ -38,18 +46,21 @@ export function Results() {
               transition={{ duration: 0.6, delay: i * 0.1 }}
               className="group relative rounded-3xl overflow-hidden bg-card border border-border hover:border-neon/40 transition-all"
             >
-              <div className="relative aspect-[4/5] overflow-hidden">
+              {/* Imagem portrait */}
+              <div className="relative aspect-[3/4] overflow-hidden">
                 <img src={c.img} alt={c.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                <div className="absolute inset-0 bg-gradient-to-t from-card via-card/40 to-transparent" />
-                <div className="absolute top-4 left-4 glass rounded-full px-3 py-1 text-xs font-semibold text-neon">
+                <div className="absolute inset-0 bg-gradient-to-t from-card via-card/30 to-transparent" />
+                <div className="absolute top-3 left-3 text-sm font-bold text-neon px-3 py-1.5 border border-neon/30 bg-black/60 backdrop-blur-sm rounded-full">
                   {c.change}
                 </div>
               </div>
-              <div className="p-6">
-                <p className="text-sm leading-relaxed text-foreground/90">"{c.quote}"</p>
-                <div className="mt-5 flex items-center justify-between">
+
+              {/* Área de texto compacta */}
+              <div className="p-3">
+                <p className="text-xs leading-relaxed text-foreground/80 border-l-2 border-neon/30 pl-3">"{c.quote}"</p>
+                <div className="mt-3 flex items-center justify-between">
                   <div>
-                    <div className="font-semibold">{c.name}</div>
+                    <div className="text-sm font-semibold">{c.name}</div>
                     <div className="text-xs text-muted-foreground">Aluno GC</div>
                   </div>
                   <div className="text-xs text-muted-foreground">{c.time}</div>

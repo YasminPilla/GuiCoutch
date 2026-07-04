@@ -20,6 +20,9 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
+    
+    /* Path Aliases */
+    "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }

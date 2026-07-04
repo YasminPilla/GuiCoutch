@@ -1,3 +1,4 @@
+/* eslint-disable prettier/prettier */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
   Outlet,
@@ -55,9 +56,9 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
           >
             Try again
           </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
+          
+           <a href="/"
+            className="inline-flex items-center justify-center rounded-full border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
           >
             Go home
           </a>
@@ -72,23 +73,44 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Guilherme Couto — Performance Coaching" },
-      { name: "description", content: "Acompanhamento profissional de alto desempenho. Treino, evolução e suporte contínuo com método estratégico." },
+      { title: "Guilherme Couto — Personal" },
+      {
+        name: "description",
+        content:
+          "Acompanhamento profissional de alto desempenho. Treino, evolução e suporte contínuo com método estratégico.",
+      },
       { name: "author", content: "Guilherme Couto" },
-      { property: "og:title", content: "Guilherme Couto — Performance Coaching" },
-      { property: "og:description", content: "Acompanhamento profissional de alto desempenho. Treino, evolução e suporte contínuo com método estratégico." },
+      { property: "og:title", content: "Guilherme Couto — Personal" },
+      {
+        property: "og:description",
+        content:
+          "Acompanhamento profissional de alto desempenho. Treino, evolução e suporte contínuo com método estratégico.",
+      },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:title", content: "Guilherme Couto — Performance Coaching" },
-      { name: "twitter:description", content: "Acompanhamento profissional de alto desempenho. Treino, evolução e suporte contínuo com método estratégico." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5cab6d58-1a7f-409a-af87-972e9861bace/id-preview-ef0de52f--fe24410c-a962-4251-bcbf-1401d9d57fb7.lovable.app-1779813200659.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5cab6d58-1a7f-409a-af87-972e9861bace/id-preview-ef0de52f--fe24410c-a962-4251-bcbf-1401d9d57fb7.lovable.app-1779813200659.png" },
+      { name: "twitter:title", content: "Guilherme Couto — Personal" },
+      {
+        name: "twitter:description",
+        content:
+          "Acompanhamento profissional de alto desempenho. Treino, evolução e suporte contínuo com método estratégico.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5cab6d58-1a7f-409a-af87-972e9861bace/id-preview-ef0de52f--fe24410c-a962-4251-bcbf-1401d9d57fb7.lovable.app-1779813200659.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/5cab6d58-1a7f-409a-af87-972e9861bace/id-preview-ef0de52f--fe24410c-a962-4251-bcbf-1401d9d57fb7.lovable.app-1779813200659.png",
+      },
+      { name: "theme-color", content: "#000000" },
     ],
     links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
+      { rel: "stylesheet", href: appCss },
+      { rel: "icon", type: "image/png", href: "/logo.png" },
+      { rel: "apple-touch-icon", sizes: "180x180", href: "/apple-touch-icon.png" },
+      { rel: "manifest", href: "/site.webmanifest" },
     ],
   }),
   shellComponent: RootShell,
@@ -99,7 +121,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="pt-BR">
       <head>
         <HeadContent />
       </head>

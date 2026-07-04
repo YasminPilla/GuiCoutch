@@ -3,85 +3,93 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { Nav } from "@/components/site/Nav";
 import { Hero } from "@/components/site/Hero";
-import { Benefits } from "@/components/site/Benefits";
 import { Quiz } from "@/components/site/Quiz";
-import { Calculator } from "@/components/site/Calculator";
+import { Plans } from "@/components/site/Plans";
+import { MicroProducts } from "@/components/site/MicroProducts";
+import { HowItWorks } from "@/components/site/HowItWorks";
 import { Results } from "@/components/site/Results";
-import { Method } from "@/components/site/Method";
-import { Dashboard } from "@/components/site/Dashboard";
-import { WeeklyReport } from "@/components/site/WeeklyReport";
 import { CTA } from "@/components/site/CTA";
+import { LandingCarousel } from "@/components/site/LandingCarousel";
 import { Footer } from "@/components/site/Footer";
-import { Studentarea } from "@/components/site/Studentarea";
-// Importamos com a primeira letra maiúscula para o React reconhecer como componente
-import { admin_dashboard as AdminDashboard } from "@/components/site/admin_dashboard";
+import { StudentDashboard } from "@/components/site/Studentarea";
+import { AdminDashboard } from "@/components/site/admin_dashboard";
+import { LoginPage } from "@/components/site/LoginPage";
+import { About } from "@/components/site/About";
+import { SectionDivider } from "@/components/site/SectionDivider";
+import { SharedAppProvider } from "@/components/site/SharedAppState";
 
 export const Route = createFileRoute("/")({
   component: Index,
 });
 
+interface User {
+  id: number;
+  email: string;
+  password: string;
+  role: "admin" | "student";
+  name: string;
+  avatar?: string;
+  status?: string;
+  createdAt: string;
+}
+
 function Index() {
-  // Estados para controlar qual área mostrar
-  const [showStudentArea, setShowStudentArea] = useState(false);
-  const [showAdminArea, setShowAdminDashboard] = useState(false);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [showLoginPage, setShowLoginPage] = useState(false);
 
-  // Funções de navegação
-  const handleAccessStudentArea = () => {
-    setShowStudentArea(true);
-    setShowAdminDashboard(false);
+  const handleLogin = (user: User) => {
+    setCurrentUser(user);
+    setShowLoginPage(false);
   };
 
-  const handleAccessAdminArea = () => {
-    setShowAdminDashboard(true);
-    setShowStudentArea(false);
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setShowLoginPage(false);
   };
 
-  const handleBackToHome = () => {
-    setShowStudentArea(false);
-    setShowAdminDashboard(false);
-  };
+  const handleAccessLogin = () => setShowLoginPage(true);
+  const handleBackToHome  = () => setShowLoginPage(false);
 
-  // Renderização Condicional
-  if (showStudentArea) {
-    return (
-      <div className="relative bg-background text-foreground overflow-x-hidden">
-        <Studentarea onBackToHome={handleBackToHome} />
-      </div>
-    );
-  }
-
-  if (showAdminArea) {
-    return (
-      <div className="relative bg-background text-foreground overflow-x-hidden">
-        {/* Aqui usamos o componente com letra maiúscula */}
-        <AdminDashboard onBackToHome={handleBackToHome} />
-      </div>
-    );
-  }
-
-  // Landing Page
   return (
-    <main className="relative bg-background text-foreground overflow-x-hidden">
-      <Nav 
-        onAccessStudentArea={handleAccessStudentArea} 
-        onAccessadmin_dashboard={handleAccessAdminArea} 
-      />
-      <Hero 
-        onAccessStudentArea={handleAccessStudentArea} 
-        onAccessadmin_dashboard={handleAccessAdminArea} 
-      />
-      <Benefits />
-      <Method />
-      <Quiz />
-      <Calculator />
-      <Results />
-      <Dashboard />
-      <WeeklyReport />
-      <CTA 
-        onAccessStudentArea={handleAccessStudentArea} 
-        onAccessadmin_dashboard={handleAccessAdminArea} 
-      />
-      <Footer />
-    </main>
+    <SharedAppProvider>
+      {showLoginPage && (
+        <LoginPage onLogin={handleLogin} onBackToHome={handleBackToHome} />
+      )}
+
+      {!showLoginPage && currentUser?.role === "admin" && (
+        <AdminDashboard user={currentUser} onLogout={handleLogout} />
+      )}
+
+      {!showLoginPage && currentUser?.role === "student" && (
+        <StudentDashboard user={currentUser} onLogout={handleLogout} />
+      )}
+
+      {!showLoginPage && !currentUser && (
+        <main className="relative bg-background text-foreground overflow-x-hidden">
+          <Nav
+            onAccessLogin={handleAccessLogin}
+            currentUser={currentUser}
+            onLogout={handleLogout}
+          />
+          <Hero />
+          <LandingCarousel />
+          <SectionDivider />
+          <Quiz />
+          <SectionDivider />
+          <Plans />
+          <SectionDivider />
+          <MicroProducts />
+          <SectionDivider />
+          <HowItWorks />
+          <SectionDivider />
+          <Results />
+          <SectionDivider />
+          <About />
+          <SectionDivider />
+          <CTA onAccessLogin={handleAccessLogin} />
+          <Footer />
+        </main>
+      )}
+    </SharedAppProvider>
   );
 }

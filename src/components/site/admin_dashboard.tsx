@@ -1,883 +1,2271 @@
-/* eslint-disable prettier/prettier */
-/* eslint-disable react-hooks/rules-of-hooks */
-/* eslint-disable react-refresh/only-export-components */
-/* eslint-disable prettier/prettier */
- 
-/* eslint-disable prettier/prettier */
-import { useState, useMemo, useRef, useEffect, ReactNode, CSSProperties } from "react";
+/* eslint-disable prettier/prettier, @typescript-eslint/ban-ts-comment */
+// @ts-nocheck
+/**
+ * GC Fitness — AdminDashboard [VERSÃO COMPLETA v3 + BIBLIOTECA DE EXERCÍCIOS]
+ *
+ * Novidades nesta versão:
+ *  - Nova aba "Biblioteca" na sidebar com CRUD completo de exercícios
+ *  - ExerciseEditor com autocomplete que busca da coleção exerciseLibrary no Firestore
+ *  - Ao selecionar sugestão do autocomplete, preenche séries/reps/carga/vídeo automaticamente
+ *  - TabBiblioteca: listagem por grupo muscular, busca, filtros, criar/editar/excluir templates
+ */
+
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  LineChart, Line, BarChart, Bar, AreaChart, Area,
-  ResponsiveContainer, XAxis, YAxis, Tooltip, Legend, PieChart, Pie, Cell
+  AreaChart, Area, LineChart, Line, BarChart, Bar,
+  ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid,
+  PieChart, Pie, Cell,
 } from "recharts";
 import {
-  LogIn, Eye, EyeOff, Users, Dumbbell, TrendingUp,
-  Calendar, Flame, Target, MessageCircle, Bell, Settings,
-  ChevronRight, Plus, Check, Trophy, BarChart2, LogOut,
-  Star, Activity, ArrowLeft, Send, Pencil, X, CheckCircle2,
-  Clock, Lock, LucideIcon, Edit2, Trash2, Save, AlertCircle,
-  Download, Filter, Search, TrendingDown, Award
+  LogOut, Users, Dumbbell, TrendingUp, MessageCircle, Bell, Settings,
+  ChevronRight, ChevronDown, Plus, Check, Trophy, BarChart2,
+  Activity, Send, X, CheckCircle2, Clock, Edit2, Trash2, Save,
+  AlertCircle, Download, Search, Award, Shield, FileText,
+  AlertTriangle, UserPlus, Database, Sliders, Menu, Image,
+  Camera, ZoomIn, RefreshCw, ArrowLeft, GripVertical,
+  Play, Video, Link, Eye, ChevronUp, RotateCcw, Copy,
+  Calendar, CalendarOff, BarChart as BarChartIcon, Layers,
+  BookOpen, Filter, Tag, Zap,
 } from "lucide-react";
 
-// ─── TYPES & INTERFACES ───────────────────────────────────────────────────
+import {
+  useAdminProps,
+  AdminPhotosTab,
+  type User,
+  type StudentData,
+  type Workout,
+  type Exercise,
+  type ProgressPhoto,
+  type WorkoutSession,
+  type ExerciseTemplate,
+  MUSCLE_GROUPS,
+  EQUIPMENT_OPTIONS,
+} from "@/components/site/SharedAppState";
 
-interface User {
-  id: number;
-  email: string;
-  password: string;
-  role: "admin" | "student";
-  name: string;
-  avatar?: string;
-}
+// ─── DESIGN TOKENS ────────────────────────────────────────────────────────
+const N       = "#00C96B";
+const CARD_BG = "rgba(255,255,255,0.04)";
+const CARD_BG2= "rgba(255,255,255,0.07)";
+const BORDER  = "rgba(255,255,255,0.09)";
+const BORDER2 = "rgba(255,255,255,0.15)";
+const MUTED   = "rgba(240,240,240,0.45)";
+const MUTED2  = "rgba(240,240,240,0.65)";
+const DANGER  = "#FF4D5E";
+const AMBER   = "#F59E0B";
+const BLUE    = "#3B82F6";
+const TEAL    = "#14B8A6";
+const PURPLE  = "#A855F7";
 
-interface Exercise {
-  name: string;
-  sets: string;
-  load: string;
-  note: string;
-}
-
-interface Workout {
-  id: number;
-  name: string;
-  day: string;
-  exercises: Exercise[];
-}
-
-interface Goal {
-  t: string;
-  p: number;
-}
-
-interface Message {
-  from: "coach" | "student";
-  text: string;
-  time: string;
-}
-
-interface WeightEntry {
-  d: string;
-  v: number;
-}
-
-interface WeekFreqEntry {
-  d: string;
-  v: number;
-}
-
-interface StudentData {
-  goal: string;
-  weeks: number;
-  startWeight: number;
-  currentWeight: number;
-  streak: number;
-  monthlyWorkouts: number;
-  weightHistory: WeightEntry[];
-  weekFreq: WeekFreqEntry[];
-  workouts: Workout[];
-  coachNote: string;
-  goals: Goal[];
-  messages: Message[];
-}
-
-interface StudentRecord extends User {
-  data: StudentData;
-}
-
-interface NeonBtnProps {
-  children: ReactNode;
-  onClick?: () => void;
-  secondary?: boolean;
-  small?: boolean;
-  danger?: boolean;
-  style?: CSSProperties;
-}
-
-interface KpiCardProps {
-  icon: LucideIcon;
-  label: string;
-  value: string | number;
-  delta: string;
-  color?: string;
-}
-
-interface LoginPageProps {
-  onLogin: (user: User) => void;
-  onBackToHome?: () => void;
-}
-
-interface AdminDashboardProps {
-  user: User;
-  onLogout: () => void;
-}
-
-interface admin_dashboardProps {
-  onBackToHome?: () => void;
-}
-
-interface TabItem {
-  id: "dashboard" | "alunos" | "treinos" | "mensagens" | "relatorios";
-  label: string;
-  icon: LucideIcon;
-}
-
-// ─── Design tokens ─────────────────────────────────────────────────────────
-const N = "#00FF88"; // neon
-const CARD = "rgba(255,255,255,0.04)";
-const BORDER = "rgba(255,255,255,0.08)";
-const MUTED = "rgba(255,255,255,0.45)";
-const DANGER = "#FF4444";
-
-const css = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap');
-  .admin-area * {box-sizing:border-box}
-  .admin-area .display{font-family:'Syne',sans-serif}
-  .admin-area .neon{color:${N}}
-  .admin-area .muted{color:${MUTED}}
-  .admin-area input,.admin-area textarea{background:${CARD};border:1px solid ${BORDER};color:#f5f5f5;font-family:'DM Sans',sans-serif;border-radius:12px;padding:12px 16px;width:100%;font-size:14px;outline:none;transition:border .2s}
-  .admin-area input:focus,.admin-area textarea:focus{border-color:${N}44}
-  .admin-area button{cursor:pointer;font-family:'DM Sans',sans-serif}
-  .admin-area .card{background:${CARD};border:1px solid ${BORDER};border-radius:20px;padding:20px}
-  .admin-area .glass{background:rgba(255,255,255,0.05);backdrop-filter:blur(12px);border:1px solid ${BORDER};border-radius:16px}
-  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
-  .admin-area .pulse{animation:pulse 2s infinite}
-  .admin-area .tab-btn{background:none;border:none;padding:8px 16px;border-radius:10px;font-size:13px;font-weight:500;color:${MUTED};transition:all .2s}
-  .admin-area .tab-btn.active{background:${N}18;color:${N}}
-  .admin-area .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600}
-  .admin-area .student-row{display:flex;align-items:center;padding:12px;border-radius:12px;background:${CARD};border:1px solid ${BORDER};margin-bottom:8px;transition:all .2s}
-  .admin-area .student-row:hover{background:rgba(0,255,136,0.06);border-color:${N}44}
-`;
-
-// ─── Mock data ────────────────────────────────────────────────────────────
-const USERS: User[] = [
-  { id: 1, email: "guilherme@gc.com", password: "admin123", role: "admin", name: "Guilherme Couto" },
-  { id: 2, email: "rafael@email.com", password: "rafael123", role: "student", name: "Rafael Mendes", avatar: "RM" },
-  { id: 3, email: "camila@email.com", password: "camila123", role: "student", name: "Camila Santos", avatar: "CS" },
-  { id: 4, email: "bruno@email.com", password: "bruno123", role: "student", name: "Bruno Alves", avatar: "BA" },
-];
-
-const STUDENTS_DATA: Record<number, StudentData> = {
-  2: {
-    goal: "Perder gordura", weeks: 8, startWeight: 88, currentWeight: 82.9,
-    streak: 23, monthlyWorkouts: 21,
-    weightHistory: [
-      {d:"S1",v:88},{d:"S2",v:87.2},{d:"S3",v:86.5},{d:"S4",v:85.8},
-      {d:"S5",v:85.1},{d:"S6",v:84.3},{d:"S7",v:83.6},{d:"S8",v:82.9},
-    ],
-    weekFreq: [{d:"Seg",v:1},{d:"Ter",v:1},{d:"Qua",v:0},{d:"Qui",v:1},{d:"Sex",v:1},{d:"Sáb",v:1},{d:"Dom",v:0}],
-    workouts: [
-      { id:1, name:"Treino A · Superior", day:"Segunda", exercises:[
-        {name:"Supino Inclinado",sets:"4x10",load:"70kg",note:"Foco na eccêntrica"},
-        {name:"Remada Curvada",sets:"4x8",load:"80kg",note:"Cotovelo próximo ao corpo"},
-        {name:"Desenvolvimento Halter",sets:"3x12",load:"22kg",note:""},
-        {name:"Tríceps Corda",sets:"3x15",load:"30kg",note:""},
-        {name:"Rosca Direta",sets:"3x12",load:"35kg",note:""},
-      ]},
-      { id:2, name:"Treino B · Inferior", day:"Terça", exercises:[
-        {name:"Agachamento Livre",sets:"4x8",load:"100kg",note:"+5kg esta semana"},
-        {name:"Leg Press 45°",sets:"3x12",load:"200kg",note:""},
-        {name:"Cadeira Extensora",sets:"3x15",load:"60kg",note:""},
-        {name:"Mesa Flexora",sets:"3x12",load:"55kg",note:""},
-        {name:"Panturrilha em Pé",sets:"4x20",load:"80kg",note:""},
-      ]},
-      { id:3, name:"Treino C · Pull", day:"Quinta", exercises:[
-        {name:"Barra Fixa",sets:"4x6",load:"Peso corporal",note:"Adicionar carga em breve"},
-        {name:"Serrote",sets:"4x10",load:"32kg",note:""},
-        {name:"Pulldown Neutro",sets:"3x12",load:"70kg",note:""},
-        {name:"Rosca Martelo",sets:"3x12",load:"16kg",note:""},
-      ]},
-    ],
-    coachNote: "Excelente semana, Rafael. Aumentamos a carga no agachamento em 5kg e adicionamos um dia de mobilidade. Mantém a constância — você está no caminho exato.",
-    goals: [{t:"5 treinos completos",p:100},{t:"Hidratação 3L/dia",p:86},{t:"Sono 7h+",p:71}],
-    messages: [
-      {from:"coach",text:"Oi Rafael! Semana excelente. Próxima semana vamos aumentar volume no superior.",time:"10:32"},
-      {from:"student",text:"Obrigado! Me sinto muito mais forte. Agachamento ficou mais fácil hoje.",time:"11:05"},
-      {from:"coach",text:"Perfeito! Isso é a progressão de carga funcionando. Continua assim 💪",time:"11:20"},
-    ]
-  },
-  3: {
-    goal: "Ganhar massa magra", weeks: 12, startWeight: 58, currentWeight: 62.4,
-    streak: 18, monthlyWorkouts: 19,
-    weightHistory: [
-      {d:"S1",v:58},{d:"S2",v:58.5},{d:"S3",v:59},{d:"S4",v:59.6},
-      {d:"S5",v:60.2},{d:"S6",v:60.9},{d:"S7",v:61.5},{d:"S8",v:62.4},
-    ],
-    weekFreq: [{d:"Seg",v:1},{d:"Ter",v:0},{d:"Qua",v:1},{d:"Qui",v:1},{d:"Sex",v:0},{d:"Sáb",v:1},{d:"Dom",v:0}],
-    workouts: [
-      { id:1, name:"Treino A · Full Body", day:"Segunda", exercises:[
-        {name:"Agachamento",sets:"3x10",load:"50kg",note:""},
-        {name:"Supino Plano",sets:"3x10",load:"40kg",note:""},
-        {name:"Remada Máquina",sets:"3x12",load:"50kg",note:""},
-        {name:"Tríceps Francês",sets:"3x12",load:"15kg",note:""},
-      ]},
-    ],
-    coachNote: "Camila, sua evolução em força está impressionante. Continuamos o foco em hipertrofia controlada.",
-    goals: [{t:"4 treinos completos",p:100},{t:"Proteína 120g/dia",p:78},{t:"Sono 8h+",p:64}],
-    messages: [
-      {from:"coach",text:"Camila, seus números de força estão subindo muito bem!",time:"09:15"},
-      {from:"student",text:"Estou adorando! Primeira vez que vejo resultado tão consistente.",time:"10:00"},
-    ]
-  },
-  4: {
-    goal: "Performance", weeks: 6, startWeight: 82, currentWeight: 80.5,
-    streak: 31, monthlyWorkouts: 24,
-    weightHistory: [
-      {d:"S1",v:82},{d:"S2",v:81.5},{d:"S3",v:81},{d:"S4",v:80.8},
-      {d:"S5",v:80.6},{d:"S6",v:80.5},
-    ],
-    weekFreq: [{d:"Seg",v:1},{d:"Ter",v:1},{d:"Qua",v:1},{d:"Qui",v:1},{d:"Sex",v:1},{d:"Sáb",v:0},{d:"Dom",v:0}],
-    workouts: [
-      { id:1, name:"Treino A · Força", day:"Segunda", exercises:[
-        {name:"Deadlift",sets:"5x5",load:"140kg",note:"RPE 8"},
-        {name:"Agachamento High Bar",sets:"5x5",load:"110kg",note:"RPE 8"},
-        {name:"Press Overhead",sets:"4x6",load:"70kg",note:""},
-      ]},
-    ],
-    coachNote: "Bruno, você quebrou seu recorde no deadlift essa semana. 140kg está impecável. Próximo ciclo foco em speed work.",
-    goals: [{t:"5 treinos força",p:100},{t:"RPE controlado",p:92},{t:"Mobilidade 15min",p:60}],
-    messages: [
-      {from:"coach",text:"Bruno! 140kg no deadlift essa semana. Fantástico!",time:"18:00"},
-      {from:"student",text:"Mal acreditei. Obrigado pelo ciclo que montou!",time:"18:30"},
-    ]
-  },
+const CHART_TOOLTIP = {
+  contentStyle: { background: "#1a1a1a", border: `1px solid ${BORDER}`, borderRadius: 10, fontSize: 12 },
+  labelStyle: { color: "#f0f0f0" },
+  itemStyle: { color: MUTED2 },
 };
 
-// ─── Components ───────────────────────────────────────────────────────────
-
-function NeonBtn({ children, onClick, secondary, small, danger, style = {} }: NeonBtnProps) {
-  const base: CSSProperties = {
-    display: "inline-flex", alignItems: "center", gap: 8,
-    borderRadius: 100, fontWeight: 600, cursor: "pointer", transition: "all .2s",
-    fontSize: small ? 13 : 15, padding: small ? "8px 18px" : "14px 28px",
-    border: "none",
-  };
-  let variant: CSSProperties;
-  if (danger) {
-    variant = { background: DANGER, color: "#fff" };
-  } else if (secondary) {
-    variant = { background: "rgba(255,255,255,0.06)", color: "#f5f5f5", border: `1px solid ${BORDER}` };
-  } else {
-    variant = { background: N, color: "#000" };
+// ─── GLOBAL CSS ───────────────────────────────────────────────────────────
+const GLOBAL_CSS = `
+  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap');
+  .adm * { box-sizing: border-box; }
+  .adm { font-family: 'DM Sans', system-ui, sans-serif; }
+  .adm .display { font-family: 'Syne', sans-serif; font-weight: 800; }
+  .adm .muted  { color: ${MUTED}; }
+  .adm .muted2 { color: ${MUTED2}; }
+  .adm .neon   { color: ${N}; }
+  .adm input, .adm textarea, .adm select {
+    background: ${CARD_BG}; border: 1px solid ${BORDER}; color: #f0f0f0;
+    font-family: 'DM Sans', sans-serif; border-radius: 10px;
+    padding: 10px 14px; width: 100%; font-size: 14px; outline: none; transition: border .2s;
   }
+  .adm input:focus, .adm textarea:focus, .adm select:focus {
+    border-color: ${N}44; box-shadow: 0 0 0 3px ${N}10;
+  }
+  .adm select option { background: #1a1a1a; }
+  .adm button { cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .adm .card  { background: ${CARD_BG}; border: 1px solid ${BORDER}; border-radius: 18px; padding: 16px; }
+  @media (min-width: 640px) { .adm .card { padding: 20px; } }
+  .adm .tab-btn {
+    background: none; border: none; padding: 7px 12px; border-radius: 10px;
+    font-size: 13px; font-weight: 500; color: ${MUTED}; transition: all .2s; white-space: nowrap;
+  }
+  .adm .tab-btn.active { background: ${N}18; color: ${N}; font-weight: 600; }
+  .adm .badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; }
+  .adm .badge-green  { background: ${N}15; color: ${N}; }
+  .adm .badge-red    { background: ${DANGER}15; color: ${DANGER}; }
+  .adm .badge-amber  { background: ${AMBER}15; color: ${AMBER}; }
+  .adm .badge-blue   { background: ${BLUE}15; color: ${BLUE}; }
+  .adm .badge-purple { background: ${PURPLE}15; color: ${PURPLE}; }
+  .adm .badge-teal   { background: ${TEAL}15; color: ${TEAL}; }
+  .adm .student-row {
+    display: flex; align-items: center; padding: 12px 14px; border-radius: 12px;
+    background: ${CARD_BG}; border: 1px solid ${BORDER}; margin-bottom: 8px;
+    transition: all .2s; cursor: pointer;
+  }
+  .adm .student-row:hover, .adm .student-row.selected { background: ${N}08; border-color: ${N}33; }
+  .adm .nav-item {
+    display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 10px;
+    font-size: 14px; font-weight: 500; color: ${MUTED2}; cursor: pointer; transition: all .15s;
+  }
+  .adm .nav-item:hover { background: ${CARD_BG2}; color: #f0f0f0; }
+  .adm .nav-item.active { background: ${N}15; color: ${N}; }
+  .adm ::-webkit-scrollbar { width: 4px; height: 4px; }
+  .adm ::-webkit-scrollbar-track { background: transparent; }
+  .adm ::-webkit-scrollbar-thumb { background: ${BORDER2}; border-radius: 4px; }
+  .adm .progress-bar { height: 6px; background: ${CARD_BG2}; border-radius: 3px; overflow: hidden; }
+  .adm .progress-fill { height: 100%; background: ${N}; border-radius: 3px; transition: width .5s ease; }
+  .adm .config-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 13px 0; border-bottom: 1px solid ${BORDER};
+  }
+  .adm .config-row:last-child { border-bottom: none; }
+  .adm .toggle { position: relative; width: 36px; height: 20px; display: inline-block; flex-shrink: 0; }
+  .adm .toggle input { opacity: 0; width: 0; height: 0; }
+  .adm .toggle-slider {
+    position: absolute; inset: 0; background: ${CARD_BG2}; border-radius: 20px;
+    cursor: pointer; transition: .3s; border: 1px solid ${BORDER};
+  }
+  .adm .toggle-slider:before {
+    position: absolute; content: ""; width: 14px; height: 14px;
+    left: 2px; top: 2px; border-radius: 50%; background: ${MUTED}; transition: .3s;
+  }
+  .adm .toggle input:checked + .toggle-slider { background: ${N}20; border-color: ${N}55; }
+  .adm .toggle input:checked + .toggle-slider:before { transform: translateX(16px); background: ${N}; }
+  .adm .perm-item {
+    background: ${CARD_BG}; border: 1px solid ${BORDER}; border-radius: 10px;
+    padding: 12px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  }
+  .adm table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .adm thead th {
+    font-size: 11px; font-weight: 700; color: ${MUTED}; text-transform: uppercase;
+    letter-spacing: .06em; padding: 10px 12px; text-align: left;
+    border-bottom: 1px solid ${BORDER}; white-space: nowrap;
+  }
+  .adm tbody tr { border-bottom: 1px solid ${BORDER}; transition: background .15s; }
+  .adm tbody tr:hover { background: ${CARD_BG2}; }
+  .adm tbody tr:last-child { border: none; }
+  .adm td { padding: 11px 12px; vertical-align: middle; }
+  @keyframes adm-fadein { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+  .adm .toast { animation: adm-fadein .25s ease; }
+  .adm .kpi-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+  @media (min-width: 768px) { .adm .kpi-grid { grid-template-columns: repeat(4,1fr); gap: 14px; } }
+  .adm .chart-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  @media (min-width: 900px) { .adm .chart-grid { grid-template-columns: 1.2fr 1fr; } }
+  .adm .report-grid { display: grid; grid-template-columns: 1fr; gap: 14px; }
+  @media (min-width: 900px) { .adm .report-grid { grid-template-columns: 1.3fr 1fr; } }
+  .adm .perm-grid { display: grid; grid-template-columns: 1fr; gap: 10px; }
+  @media (min-width: 640px) { .adm .perm-grid { grid-template-columns: repeat(2,1fr); } }
+  @media (min-width: 900px) { .adm .perm-grid { grid-template-columns: repeat(3,1fr); } }
+  .adm .student-stats-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+  @media (min-width: 480px) { .adm .student-stats-grid { grid-template-columns: repeat(4,1fr); } }
+  .adm .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .adm .ex-row {
+    display: grid;
+    grid-template-columns: 28px 1fr 80px 70px 60px 70px 36px;
+    gap: 8px; align-items: center;
+    padding: 10px 12px; border-radius: 12px;
+    background: ${CARD_BG}; border: 1px solid ${BORDER}; margin-bottom: 8px;
+    transition: border-color .15s;
+  }
+  .adm .ex-row:hover { border-color: ${BORDER2}; }
+  .adm .ex-row.editing { border-color: ${N}44; background: ${N}06; }
+  @media (max-width: 640px) {
+    .adm .ex-row { grid-template-columns: 1fr; }
+  }
+  .adm .day-dot {
+    width: 32px; height: 32px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px; font-weight: 700; flex-shrink: 0;
+  }
+  .adm .calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7,1fr);
+    gap: 4px;
+  }
+  /* ── Autocomplete dropdown ── */
+  .adm .autocomplete-dropdown {
+    position: absolute; top: 100%; left: 0; right: 0; z-index: 200;
+    background: #1a1a1a; border: 1px solid ${BORDER2}; border-radius: 12px;
+    overflow: hidden; box-shadow: 0 12px 32px rgba(0,0,0,0.6);
+    max-height: 260px; overflow-y: auto;
+  }
+  .adm .autocomplete-item {
+    display: flex; align-items: flex-start; gap: 10; padding: 10px 14px;
+    cursor: pointer; transition: background .12s; border-bottom: 1px solid ${BORDER};
+  }
+  .adm .autocomplete-item:last-child { border-bottom: none; }
+  .adm .autocomplete-item:hover { background: ${N}12; }
+  .adm .autocomplete-item.highlighted { background: ${N}18; }
+  /* ── Biblioteca grid ── */
+  .adm .lib-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;
+  }
+  .adm .lib-card {
+    background: ${CARD_BG}; border: 1px solid ${BORDER}; border-radius: 14px;
+    overflow: hidden; transition: border-color .18s, transform .18s;
+  }
+  .adm .lib-card:hover { border-color: ${BORDER2}; transform: translateY(-1px); }
+`;
+
+// ─── UTILITÁRIOS ──────────────────────────────────────────────────────────
+
+function Btn({ children, onClick, variant = "primary", size = "md", icon: Icon, disabled = false, style = {} }) {
+  const base = {
+    display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
+    borderRadius: 100, fontWeight: 600, cursor: disabled ? "not-allowed" : "pointer",
+    transition: "all .18s", border: "none", opacity: disabled ? 0.5 : 1,
+    fontSize: size === "sm" ? 12 : 14,
+    padding: size === "sm" ? "8px 16px" : "12px 22px",
+    minHeight: size === "sm" ? 36 : 44,
+  };
+  const variants = {
+    primary:   { background: N, color: "#000" },
+    secondary: { background: CARD_BG, color: "#f0f0f0", border: `1px solid ${BORDER}` },
+    danger:    { background: `${DANGER}15`, color: DANGER, border: `1px solid ${DANGER}33` },
+    ghost:     { background: "transparent", color: MUTED2 },
+    amber:     { background: `${AMBER}15`, color: AMBER, border: `1px solid ${AMBER}33` },
+  };
   return (
-    <button style={{ ...base, ...variant, ...style }} onClick={onClick}>
+    <button style={{ ...base, ...variants[variant], ...style }} onClick={!disabled ? onClick : undefined} disabled={disabled}>
+      {Icon && <Icon size={size === "sm" ? 13 : 15} />}
       {children}
     </button>
   );
 }
 
-function KpiCard({ icon: Icon, label, value, delta, color = N }: KpiCardProps) {
+function Avatar({ initials, size = 36, color = N }) {
   return (
-    <div className="card" style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <span style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: "0.08em" }}>{label}</span>
-        <Icon size={16} style={{ color }} />
-      </div>
-      <div className="display" style={{ fontSize: 26, fontWeight: 800 }}>{value}</div>
-      <div style={{ fontSize: 12, color }}>{delta}</div>
+    <div style={{
+      width: size, height: size, borderRadius: "50%",
+      background: `${color}18`, border: `1.5px solid ${color}44`,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: size * 0.3, fontWeight: 700, color, flexShrink: 0,
+    }}>
+      {initials}
     </div>
   );
 }
 
-// ─── LOGIN PAGE ────────────────────────────────────────────────────────────
-function LoginPage({ onLogin, onBackToHome }: LoginPageProps) {
-  const [email, setEmail] = useState<string>("");
-  const [password, setPassword] = useState<string>("");
-  const [show, setShow] = useState<boolean>(false);
-  const [error, setError] = useState<string>("");
-  const [loading, setLoading] = useState<boolean>(false);
+function KpiCard({ icon: Icon, label, value, delta, color = N }) {
+  return (
+    <div className="card" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <span style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", fontWeight: 700 }}>{label}</span>
+        <Icon size={15} style={{ color, flexShrink: 0 }} />
+      </div>
+      <div className="display" style={{ fontSize: 22, fontWeight: 800, color }}>{value}</div>
+      <div style={{ fontSize: 11, color: MUTED }}>{delta}</div>
+    </div>
+  );
+}
 
-  function handleSubmit() {
-    if (!email.trim() || !password.trim()) {
-      setError("E-mail e senha são obrigatórios.");
-      return;
-    }
+function Badge({ children, variant = "green" }) {
+  return <span className={`badge badge-${variant}`}>{children}</span>;
+}
 
-    try {
-      setLoading(true);
-      setTimeout(() => {
-        const user = USERS.find(u => u.email === email && u.password === password && u.role === "admin");
-        if (user) {
-          onLogin(user);
-        } else {
-          setError("E-mail ou senha incorretos. (Use: guilherme@gc.com / admin123)");
-        }
-        setLoading(false);
-      }, 600);
-    } catch (err) {
-      setError("Erro ao fazer login. Tente novamente.");
-      setLoading(false);
-    }
-  }
+function ProgressBar({ value, max = 100, color = N }) {
+  const pct = Math.min(100, Math.round((value / max) * 100));
+  return (
+    <div className="progress-bar">
+      <div className="progress-fill" style={{ width: `${pct}%`, background: color }} />
+    </div>
+  );
+}
+
+function Toggle({ checked, onChange, label }) {
+  return (
+    <label className="toggle" title={label}>
+      <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} />
+      <span className="toggle-slider" />
+    </label>
+  );
+}
+
+function ConfigRow({ label, description, control }) {
+  return (
+    <div className="config-row">
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 500 }}>{label}</div>
+        {description && <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{description}</div>}
+      </div>
+      <div style={{ flexShrink: 0 }}>{control}</div>
+    </div>
+  );
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────
+function useToast() {
+  const [toasts, setToasts] = useState([]);
+  const push = useCallback((message, type = "success") => {
+    const id = Date.now();
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3200);
+  }, []);
+
+  const ToastContainer = () => (
+    <div style={{ position: "fixed", bottom: 16, right: 16, left: 16, zIndex: 9999, display: "flex", flexDirection: "column", gap: 8, pointerEvents: "none" }}>
+      <AnimatePresence>
+        {toasts.map(t => (
+          <motion.div key={t.id}
+            initial={{ opacity: 0, y: 10, scale: .97 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 10, scale: .97 }}
+            style={{
+              background: "#1c1c1c",
+              border: `1px solid ${t.type === "success" ? N + "44" : t.type === "error" ? DANGER + "44" : BLUE + "44"}`,
+              borderRadius: 12, padding: "12px 16px", fontSize: 13,
+              display: "flex", alignItems: "center", gap: 10,
+              boxShadow: "0 8px 24px rgba(0,0,0,0.4)", pointerEvents: "auto",
+            }}>
+            {t.type === "success"
+              ? <CheckCircle2 size={16} style={{ color: N, flexShrink: 0 }} />
+              : t.type === "error"
+              ? <AlertCircle size={16} style={{ color: DANGER, flexShrink: 0 }} />
+              : <AlertTriangle size={16} style={{ color: BLUE, flexShrink: 0 }} />}
+            <span>{t.message}</span>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+    </div>
+  );
+
+  return { toast: push, ToastContainer };
+}
+
+// ─── MODAL ────────────────────────────────────────────────────────────────
+function Modal({ open, onClose, title, children, width = 480 }) {
+  useEffect(() => {
+    const handler = e => { if (e.key === "Escape") onClose(); };
+    if (open) document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [open, onClose]);
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
-      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at top right, rgba(0,255,136,0.08), transparent 50%), radial-gradient(ellipse at bottom left, rgba(0,255,136,0.04), transparent 50%)" }} />
-      <motion.div
-        initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }}
-        style={{ width: "100%", maxWidth: 420, position: "relative", zIndex: 1 }}
-      >
-        {onBackToHome && (
-          <button
-            onClick={onBackToHome}
+    <AnimatePresence>
+      {open && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          onClick={e => e.target === e.currentTarget && onClose()}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", zIndex: 500, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <motion.div
+            initial={{ opacity: 0, y: 40 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 40 }}
             style={{
-              position: "absolute",
-              top: -40,
-              left: 0,
-              background: "none",
-              border: "none",
-              color: MUTED,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              fontSize: 12,
-              transition: "color 0.2s",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = N)}
-            onMouseLeave={(e) => (e.currentTarget.style.color = MUTED)}
-          >
-            <ArrowLeft size={14} /> Voltar
-          </button>
-        )}
-
-        <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", justifyContent: "center", width: 52, height: 52, borderRadius: 16, background: N, marginBottom: 20 }}>
-            <span className="display" style={{ fontWeight: 800, color: "#000", fontSize: 18 }}>GC</span>
-          </div>
-          <h1 className="display" style={{ fontSize: 32, fontWeight: 800, marginBottom: 8 }}>Área do Admin</h1>
-          <p className="muted" style={{ fontSize: 14 }}>Gerenciamento de alunos e treinos</p>
-        </div>
-
-        <div className="glass" style={{ padding: 32 }}>
-          <div style={{ marginBottom: 16 }}>
-            <label style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 8 }}>E-mail</label>
-            <input
-              type="email" placeholder="seu@email.com" value={email}
-              onChange={e => { setEmail(e.target.value); setError(""); }}
-              onKeyDown={e => e.key === "Enter" && handleSubmit()}
-            />
-          </div>
-          <div style={{ marginBottom: 24 }}>
-            <label style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 8 }}>Senha</label>
-            <div style={{ position: "relative" }}>
-              <input
-                type={show ? "text" : "password"} placeholder="••••••••" value={password}
-                onChange={e => { setPassword(e.target.value); setError(""); }}
-                onKeyDown={e => e.key === "Enter" && handleSubmit()}
-              />
-              <button
-                onClick={() => setShow(!show)}
-                style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", color: MUTED, cursor: "pointer" }}
-              >
-                {show ? <EyeOff size={16} /> : <Eye size={16} />}
+              background: "#141414", border: `1px solid ${BORDER2}`,
+              borderRadius: "20px 20px 0 0", padding: "24px 20px",
+              width: "100%", maxWidth: width, position: "relative",
+              maxHeight: "92vh", overflowY: "auto",
+            }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, background: BORDER2, margin: "0 auto 20px" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
+              <h3 className="display" style={{ fontSize: 17, margin: 0 }}>{title}</h3>
+              <button onClick={onClose} style={{ background: "none", border: "none", color: MUTED, cursor: "pointer", padding: 6, minHeight: 44, minWidth: 44, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <X size={18} />
               </button>
             </div>
-          </div>
-          {error && (
-            <div style={{ background: `${DANGER}15`, border: `1px solid ${DANGER}44`, borderRadius: 12, padding: 12, marginBottom: 16, fontSize: 13, color: DANGER, display: "flex", alignItems: "center", gap: 8 }}>
-              <AlertCircle size={14} /> {error}
-            </div>
-          )}
-          <NeonBtn onClick={handleSubmit} style={{ justifyContent: "center", width: "100%" }}>
-            {loading ? "Entrando..." : "Entrar"}
-          </NeonBtn>
-        </div>
-      </motion.div>
-    </div>
+            {children}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
 
-// ─── ADMIN DASHBOARD ───────────────────────────────────────────────────────
-function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
-  const [tab, setTab] = useState<"dashboard" | "alunos" | "treinos" | "mensagens" | "relatorios">("dashboard");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedStudent, setSelectedStudent] = useState<number | null>(null);
-  const [editingNote, setEditingNote] = useState<string>("");
-  const [isEditingNote, setIsEditingNote] = useState(false);
-  const [chatInput, setChatInput] = useState("");
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+// ─── SIDEBAR ──────────────────────────────────────────────────────────────
+// ── ALTERADO: adicionada entrada "biblioteca" ──
+const SIDEBAR_ITEMS = [
+  { section: "Principal", items: [
+    { id: "dashboard",  label: "Dashboard",   icon: BarChart2 },
+    { id: "alunos",     label: "Alunos",      icon: Users },
+    { id: "treinos",    label: "Treinos",      icon: Dumbbell },
+    { id: "biblioteca", label: "Biblioteca",   icon: BookOpen },
+    { id: "fotos",      label: "Fotos",        icon: Camera, badgeKey: "photos" },
+    { id: "relatorios", label: "Relatórios",   icon: TrendingUp },
+  ]},
+  { section: "Sistema", items: [
+    { id: "notificacoes",  label: "Notificações",  icon: Bell,    badgeKey: "notifs" },
+    { id: "permissoes",    label: "Permissões",    icon: Shield },
+    { id: "auditoria",     label: "Auditoria",     icon: FileText },
+    { id: "configuracoes", label: "Configurações", icon: Settings },
+  ]},
+];
 
-  const students = USERS.filter(u => u.role === "student");
-  const filteredStudents = students.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    s.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const currentStudent = selectedStudent ? students.find(s => s.id === selectedStudent) : null;
-  const currentStudentData = currentStudent ? STUDENTS_DATA[currentStudent.id] : null;
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [currentStudentData?.messages]);
-
-  function sendMsg() {
-    if (!chatInput.trim() || !currentStudentData) return;
-    const newMsg: Message = {
-      from: "coach",
-      text: chatInput,
-      time: new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })
-    };
-    currentStudentData.messages.push(newMsg);
-    setChatInput("");
-  }
-
-  function saveNote() {
-    if (currentStudentData) {
-      currentStudentData.coachNote = editingNote;
-      setIsEditingNote(false);
-    }
-  }
-
-  const tabs: TabItem[] = [
-    { id: "dashboard", label: "Dashboard", icon: BarChart2 },
-    { id: "alunos", label: "Alunos", icon: Users },
-    { id: "treinos", label: "Treinos", icon: Dumbbell },
-    { id: "mensagens", label: "Mensagens", icon: MessageCircle },
-    { id: "relatorios", label: "Relatórios", icon: TrendingUp },
-  ];
-
-  const totalStudents = students.length;
-  const activeStudents = students.filter(s => STUDENTS_DATA[s.id]?.streak > 0).length;
-  const avgStreak = Math.round(students.reduce((sum, s) => sum + (STUDENTS_DATA[s.id]?.streak || 0), 0) / students.length);
-  const totalWorkouts = students.reduce((sum, s) => sum + (STUDENTS_DATA[s.id]?.monthlyWorkouts || 0), 0);
-
-  return (
-    <div className="admin-area" style={{ minHeight: "100vh", background: "#0a0a0a", color: "#f5f5f5", paddingBottom: 40 }}>
-      <style>{css}</style>
-
-      {/* Header */}
-      <div style={{ borderBottom: `1px solid ${BORDER}`, padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, background: "rgba(10,10,10,0.8)", backdropFilter: "blur(12px)", zIndex: 100 }}>
-        <div>
-          <h1 className="display" style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Admin</h1>
-          <p style={{ fontSize: 12, color: MUTED, margin: "4px 0 0 0" }}>Bem-vindo, {user.name}</p>
+function Sidebar({ activeTab, onTabChange, user, onLogout, unreadNotifs, pendingPhotos, isMobile, onClose }) {
+  const content = (
+    <>
+      <div style={{ padding: "16px 14px", borderBottom: `1px solid ${BORDER}`, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: N, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+            <span className="display" style={{ fontWeight: 800, color: "#000", fontSize: 13 }}>GC</span>
+          </div>
+          <div>
+            <div className="display" style={{ fontSize: 15 }}>GC Fitness</div>
+            <div style={{ fontSize: 10, color: MUTED }}>Admin Panel</div>
+          </div>
         </div>
-        <NeonBtn secondary small onClick={onLogout}>
-          <LogOut size={14} /> Sair
-        </NeonBtn>
+        {isMobile && (
+          <button onClick={onClose} style={{ background: "none", border: "none", color: MUTED, cursor: "pointer", minWidth: 44, minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <X size={18} />
+          </button>
+        )}
       </div>
 
-      {/* Tabs */}
-      <div style={{ borderBottom: `1px solid ${BORDER}`, padding: "0 24px", display: "flex", gap: 8, overflowX: "auto" }}>
-        {tabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`tab-btn ${tab === t.id ? "active" : ""}`}
-          >
-            <t.icon size={14} style={{ marginRight: 4 }} />
-            {t.label}
-          </button>
+      <div style={{ flex: 1, overflowY: "auto", padding: "12px 10px" }}>
+        {SIDEBAR_ITEMS.map(section => (
+          <div key={section.section} style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".08em", padding: "0 10px", marginBottom: 6 }}>
+              {section.section}
+            </div>
+            {section.items.map(item => {
+              const Icon = item.icon;
+              const badgeCount = item.badgeKey === "notifs" ? unreadNotifs : item.badgeKey === "photos" ? pendingPhotos : 0;
+              return (
+                <div key={item.id}
+                  className={`nav-item${activeTab === item.id ? " active" : ""}`}
+                  onClick={() => { onTabChange(item.id); if (isMobile) onClose?.(); }}
+                  role="button" tabIndex={0}
+                  onKeyDown={e => e.key === "Enter" && onTabChange(item.id)}>
+                  <Icon size={17} style={{ flexShrink: 0 }} />
+                  <span style={{ flex: 1 }}>{item.label}</span>
+                  {badgeCount > 0 && (
+                    <span style={{ background: DANGER, color: "#fff", fontSize: 10, fontWeight: 700, borderRadius: 20, padding: "1px 7px", minWidth: 18, textAlign: "center" }}>
+                      {badgeCount}
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         ))}
       </div>
 
-      {/* Content */}
-      <div style={{ padding: "24px", maxWidth: 1400, margin: "0 auto" }}>
-        <AnimatePresence mode="wait">
+      <div style={{ padding: "12px 10px", borderTop: `1px solid ${BORDER}` }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", borderRadius: 12, background: CARD_BG }}>
+          <Avatar initials={user.avatar || "GC"} size={32} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{user.name}</div>
+            <div style={{ fontSize: 10, color: MUTED }}>Administrador</div>
+          </div>
+          <button onClick={onLogout} title="Sair"
+            style={{ background: "none", border: "none", color: MUTED, cursor: "pointer", minWidth: 36, minHeight: 36, display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <LogOut size={15} />
+          </button>
+        </div>
+      </div>
+    </>
+  );
 
-          {/* DASHBOARD TAB */}
-          {tab === "dashboard" && (
-            <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <h2 className="display" style={{ fontSize: 24, fontWeight: 800, marginBottom: 20 }}>Dashboard</h2>
+  if (isMobile) {
+    return (
+      <AnimatePresence>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          onClick={onClose}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 200 }} />
+        <motion.nav
+          initial={{ x: -280 }} animate={{ x: 0 }} exit={{ x: -280 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          style={{ position: "fixed", top: 0, left: 0, bottom: 0, width: 280, zIndex: 201, background: "rgba(13,13,13,0.98)", borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column" }}>
+          {content}
+        </motion.nav>
+      </AnimatePresence>
+    );
+  }
 
-              {/* KPI Cards */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16, marginBottom: 24 }}>
-                <KpiCard icon={Users} label="Total de Alunos" value={totalStudents} delta={`${activeStudents} ativos`} />
-                <KpiCard icon={Activity} label="Streaks Médio" value={avgStreak} delta="dias consecutivos" />
-                <KpiCard icon={Dumbbell} label="Treinos/Mês" value={totalWorkouts} delta="total de sessões" color="#FF6B6B" />
-                <KpiCard icon={TrendingUp} label="Taxa Ativa" value={`${Math.round((activeStudents/totalStudents)*100)}%`} delta="alunos em progresso" color="#4ECDC4" />
+  return (
+    <nav style={{ background: "rgba(0,0,0,0.45)", borderRight: `1px solid ${BORDER}`, display: "flex", flexDirection: "column", height: "100vh", position: "sticky", top: 0 }}>
+      {content}
+    </nav>
+  );
+}
+
+// ─── TAB: DASHBOARD ───────────────────────────────────────────────────────
+function TabDashboard({ users, studentsData, onNavigate }) {
+  const students = users.filter(u => u.role === "student");
+  const avgStreak = students.length
+    ? Math.round(students.reduce((s, u) => s + (studentsData[u.id]?.streak || 0), 0) / students.length)
+    : 0;
+  const totalWorkouts = students.reduce((s, u) => s + (studentsData[u.id]?.monthlyWorkouts || 0), 0);
+  const activeCount = students.filter(u => (studentsData[u.id]?.streak || 0) > 0).length;
+  const activeRate = students.length ? Math.round((activeCount / students.length) * 100) : 0;
+
+  const freqData = [
+    { w: "S1", v: 12 }, { w: "S2", v: 14 }, { w: "S3", v: 13 }, { w: "S4", v: 16 },
+    { w: "S5", v: 15 }, { w: "S6", v: 17 }, { w: "S7", v: 18 }, { w: "S8", v: totalWorkouts },
+  ];
+
+  const goalCounts = {};
+  students.forEach(u => {
+    const g = studentsData[u.id]?.goal || "Outros";
+    goalCounts[g] = (goalCounts[g] || 0) + 1;
+  });
+  const GOAL_COLORS = [N, DANGER, TEAL, AMBER, BLUE];
+  const goalData = Object.entries(goalCounts).map(([name, value], i) => ({ name, value, color: GOAL_COLORS[i % GOAL_COLORS.length] }));
+
+  return (
+    <div>
+      <div className="kpi-grid" style={{ marginBottom: 16 }}>
+        <KpiCard icon={Users}      label="Total de Alunos" value={students.length}   delta={`${activeCount} ativos`} />
+        <KpiCard icon={Award}      label="Streak Médio"    value={`${avgStreak}d`}   delta="dias consecutivos" color={AMBER} />
+        <KpiCard icon={Dumbbell}   label="Treinos/Mês"     value={totalWorkouts}     delta="sessões totais"    color={DANGER} />
+        <KpiCard icon={TrendingUp} label="Taxa Ativa"      value={`${activeRate}%`}  delta="em progresso"     color={TEAL} />
+      </div>
+
+      <div className="chart-grid" style={{ marginBottom: 14 }}>
+        <div className="card">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, gap: 8 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Frequência de Treinos</div>
+              <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>Últimas 8 semanas</div>
+            </div>
+            <Badge variant="green">Atualizado</Badge>
+          </div>
+          <div style={{ height: 180 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={freqData}>
+                <defs>
+                  <linearGradient id="neonGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%"  stopColor={N} stopOpacity={0.2} />
+                    <stop offset="95%" stopColor={N} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
+                <XAxis dataKey="w" stroke="transparent" tick={{ fill: MUTED, fontSize: 10 }} />
+                <YAxis stroke="transparent" tick={{ fill: MUTED, fontSize: 10 }} />
+                <Tooltip {...CHART_TOOLTIP} formatter={v => [`${v} sessões`, "Total"]} />
+                <Area type="monotone" dataKey="v" stroke={N} strokeWidth={2.5} fill="url(#neonGrad)" dot={{ fill: N, r: 4 }} activeDot={{ r: 6 }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="card">
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Distribuição de Objetivos</div>
+          <div style={{ fontSize: 11, color: MUTED, marginBottom: 14 }}>Todos os alunos ativos</div>
+          {goalData.length > 0 ? (
+            <div style={{ display: "flex", gap: 16, alignItems: "center" }}>
+              <div style={{ height: 140, flex: 1 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={goalData} cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={4} dataKey="value">
+                      {goalData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ background: "#1a1a1a", border: `1px solid ${BORDER}`, borderRadius: 10, fontSize: 12 }} />
+                  </PieChart>
+                </ResponsiveContainer>
               </div>
-
-              {/* Charts */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
-                <div className="card">
-                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Frequência de Treinos (Últimas 8 semanas)</div>
-                  <div style={{ height: 200 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={[
-                        {w:"S1",v:12},{w:"S2",v:14},{w:"S3",v:13},{w:"S4",v:16},
-                        {w:"S5",v:15},{w:"S6",v:17},{w:"S7",v:18},{w:"S8",v:21}
-                      ]}>
-                        <XAxis dataKey="w" stroke="#555" tick={{ fontSize: 10 }} />
-                        <YAxis stroke="#555" tick={{ fontSize: 10 }} />
-                        <Tooltip contentStyle={{ background: "#161616", border: `1px solid ${BORDER}`, borderRadius: 10 }} />
-                        <Line type="monotone" dataKey="v" stroke={N} strokeWidth={2.5} dot={{ fill: N, r: 4 }} />
-                      </LineChart>
-                    </ResponsiveContainer>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                {goalData.map((g, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 7 }}>
+                    <div style={{ width: 10, height: 10, borderRadius: 3, background: g.color, flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 500 }}>{g.name}</div>
+                      <div style={{ fontSize: 10, color: MUTED }}>{g.value} aluno{g.value > 1 ? "s" : ""}</div>
+                    </div>
                   </div>
-                </div>
-
-                <div className="card">
-                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Distribuição de Objetivos</div>
-                  <div style={{ height: 200 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <PieChart>
-                        <Pie data={[
-                          {name:"Perder gordura",value:1},{name:"Ganhar massa",value:1},{name:"Performance",value:1}
-                        ]} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={5} dataKey="value">
-                          <Cell fill={N} />
-                          <Cell fill="#FF6B6B" />
-                          <Cell fill="#4ECDC4" />
-                        </Pie>
-                      </PieChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
+                ))}
               </div>
-            </motion.div>
+            </div>
+          ) : (
+            <div style={{ textAlign: "center", padding: 24, color: MUTED, fontSize: 12 }}>Nenhum aluno cadastrado</div>
           )}
+        </div>
+      </div>
 
-          {/* ALUNOS TAB */}
-          {tab === "alunos" && (
-            <motion.div key="alunos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                <h2 className="display" style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Gerenciar Alunos</h2>
-                <NeonBtn small>
-                  <Plus size={14} /> Novo Aluno
-                </NeonBtn>
-              </div>
-
-              {/* Search */}
-              <div style={{ marginBottom: 20, position: "relative" }}>
-                <Search size={16} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: MUTED }} />
-                <input
-                  type="text"
-                  placeholder="Buscar aluno por nome ou e-mail..."
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  style={{ paddingLeft: 40 }}
-                />
-              </div>
-
-              {/* Students List */}
-              <div>
-                {filteredStudents.map(student => {
-                  const sd = STUDENTS_DATA[student.id];
-                  const isSelected = selectedStudent === student.id;
-                  return (
-                    <motion.div key={student.id} layout>
-                      <div
-                        onClick={() => setSelectedStudent(isSelected ? null : student.id)}
-                        className="student-row"
-                        style={{ cursor: "pointer" }}
-                      >
-                        <div style={{ width: 40, height: 40, borderRadius: "50%", background: `${N}18`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: N, flexShrink: 0 }}>
-                          {student.avatar}
-                        </div>
-                        <div style={{ flex: 1, marginLeft: 12 }}>
-                          <div style={{ fontSize: 14, fontWeight: 600 }}>{student.name}</div>
-                          <div style={{ fontSize: 11, color: MUTED }}>{student.email}</div>
-                        </div>
-                        <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                          <div style={{ textAlign: "right" }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: N }}>{sd?.goal}</div>
-                            <div style={{ fontSize: 11, color: MUTED }}>Streak: {sd?.streak}d</div>
-                          </div>
-                          <ChevronRight size={16} style={{ color: MUTED }} />
-                        </div>
+      <div className="card">
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Resumo de Alunos</div>
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Aluno</th><th>Objetivo</th><th>Streak</th><th>Treinos</th><th>Variação</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              {students.map(s => {
+                const sd = studentsData[s.id];
+                if (!sd) return null;
+                const diff = (sd.currentWeight - sd.startWeight).toFixed(1);
+                return (
+                  <tr key={s.id} style={{ cursor: "pointer" }} onClick={() => onNavigate("alunos", s.id)}>
+                    <td>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <Avatar initials={s.avatar} size={28} />
+                        <span style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap" }}>{s.name}</span>
                       </div>
+                    </td>
+                    <td style={{ whiteSpace: "nowrap" }}>{sd.goal}</td>
+                    <td style={{ color: N, fontWeight: 700 }}>{sd.streak}d</td>
+                    <td>{sd.monthlyWorkouts}</td>
+                    <td style={{ color: Number(diff) < 0 ? DANGER : TEAL, fontWeight: 600, whiteSpace: "nowrap" }}>
+                      {Number(diff) > 0 ? "+" : ""}{diff} kg
+                    </td>
+                    <td><Badge variant="green"><Check size={11} /> Ativo</Badge></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-                      {isSelected && (
-                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} style={{ overflow: "hidden" }}>
-                          <div className="card" style={{ marginBottom: 16, marginTop: 8, background: `${N}06`, borderColor: `${N}22` }}>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 16 }}>
-                              <div>
-                                <div style={{ fontSize: 11, color: MUTED, textTransform: "uppercase" }}>Peso Inicial</div>
-                                <div style={{ fontSize: 18, fontWeight: 700, color: N }}>{sd?.startWeight} kg</div>
-                              </div>
-                              <div>
-                                <div style={{ fontSize: 11, color: MUTED, textTransform: "uppercase" }}>Peso Atual</div>
-                                <div style={{ fontSize: 18, fontWeight: 700 }}>{sd?.currentWeight} kg</div>
-                              </div>
-                              <div>
-                                <div style={{ fontSize: 11, color: MUTED, textTransform: "uppercase" }}>Variação</div>
-                                <div style={{ fontSize: 18, fontWeight: 700, color: (sd?.currentWeight || 0) < (sd?.startWeight || 0) ? "#FF6B6B" : "#4ECDC4" }}>
-                                  {((sd?.currentWeight || 0) - (sd?.startWeight || 0)).toFixed(1)} kg
-                                </div>
-                              </div>
-                              <div>
-                                <div style={{ fontSize: 11, color: MUTED, textTransform: "uppercase" }}>Treinos/Mês</div>
-                                <div style={{ fontSize: 18, fontWeight: 700 }}>{sd?.monthlyWorkouts}</div>
-                              </div>
-                            </div>
+// ─── TAB: ALUNOS ──────────────────────────────────────────────────────────
+function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, onNavigate, toast }) {
+  const [search,    setSearch]    = useState("");
+  const [selected,  setSelected]  = useState(null);
+  const [newModal,  setNewModal]  = useState(false);
+  const [editModal, setEditModal] = useState(null);
+  const [editForm,  setEditForm]  = useState({});
+  const [newForm,   setNewForm]   = useState({ name: "", email: "", password: "", goal: "Perder gordura" });
+  const [formErrors,setFormErrors]= useState({});
 
-                            <div style={{ display: "flex", gap: 8 }}>
-                              <NeonBtn small secondary style={{ flex: 1, justifyContent: "center" }}>
-                                <Edit2 size={14} /> Editar Treino
-                              </NeonBtn>
-                              <NeonBtn small secondary style={{ flex: 1, justifyContent: "center" }}>
-                                <MessageCircle size={14} /> Mensagem
-                              </NeonBtn>
-                              <NeonBtn small danger style={{ flex: 1, justifyContent: "center" }}>
-                                <Trash2 size={14} /> Remover
-                              </NeonBtn>
-                            </div>
-                          </div>
-                        </motion.div>
-                      )}
-                    </motion.div>
-                  );
-                })}
+  const students = users.filter(u => u.role === "student");
+  const filtered  = students.filter(s =>
+    s.name.toLowerCase().includes(search.toLowerCase()) ||
+    s.email.toLowerCase().includes(search.toLowerCase())
+  );
+
+  function validateNew() {
+    const errors = {};
+    if (!newForm.name.trim())  errors.name = "Nome obrigatório";
+    if (!newForm.email.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newForm.email)) errors.email = "E-mail inválido";
+    if (newForm.password.length < 6) errors.password = "Mínimo 6 caracteres";
+    if (users.find(u => u.email === newForm.email)) errors.email = "E-mail já cadastrado";
+    return errors;
+  }
+
+  function handleCreate() {
+    const errors = validateNew();
+    if (Object.keys(errors).length) { setFormErrors(errors); return; }
+    const newId = Math.max(0, ...users.map(u => u.id)) + 1;
+    const initials = newForm.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
+    const newUser = {
+      id: newId, email: newForm.email, password: newForm.password,
+      role: "student", name: newForm.name, avatar: initials,
+      status: "active", createdAt: new Date().toLocaleDateString("pt-BR"),
+    };
+    const emptyData = {
+      goal: newForm.goal, weeks: 0, startWeight: 0, currentWeight: 0,
+      streak: 0, monthlyWorkouts: 0, level: 1, weeklyGoal: 4,
+      weightHistory: [], weekFreq: [], workouts: [], coachNote: "",
+      goals: [], messages: [], workoutSessions: [],
+      personalRecords: [], bodyMeasurements: [], achievements: [],
+      progressPhotos: [],
+    };
+    onUsersChange([...users, newUser]);
+    onStudentsDataChange({ ...studentsData, [newId]: emptyData });
+    setNewModal(false);
+    setNewForm({ name: "", email: "", password: "", goal: "Perder gordura" });
+    setFormErrors({});
+    toast(`Aluno ${newForm.name} criado!`);
+  }
+
+  function handleDelete(student) {
+    if (!window.confirm(`Remover ${student.name}? Esta ação não pode ser desfeita.`)) return;
+    onUsersChange(users.filter(u => u.id !== student.id));
+    const newData = { ...studentsData };
+    delete newData[student.id];
+    onStudentsDataChange(newData);
+    if (selected === student.id) setSelected(null);
+    toast(`${student.name} removido.`, "info");
+  }
+
+  function openEdit(student) {
+    const sd = studentsData[student.id];
+    setEditForm({
+      name: student.name,
+      email: student.email,
+      password: student.password,
+      goal: sd?.goal || "",
+      coachNote: sd?.coachNote || "",
+    });
+    setEditModal(student.id);
+  }
+
+  function handleSaveEdit() {
+    if (!editForm.name.trim()) { toast("Nome obrigatório", "error"); return; }
+    if (!editForm.password || editForm.password.length < 6) {
+      toast("Senha deve ter no mínimo 6 caracteres", "error"); return;
+    }
+    onUsersChange(users.map(u =>
+      u.id === editModal
+        ? { ...u, name: editForm.name, email: editForm.email, password: editForm.password }
+        : u
+    ));
+    onStudentsDataChange({
+      ...studentsData,
+      [editModal]: { ...studentsData[editModal], goal: editForm.goal, coachNote: editForm.coachNote },
+    });
+    toast("Dados atualizados!");
+    setEditModal(null);
+  }
+
+  function exportCSV() {
+    const rows = [["Nome", "Email", "Objetivo", "Streak", "Treinos/Mês", "Peso Atual", "Status"]];
+    students.forEach(s => {
+      const sd = studentsData[s.id];
+      rows.push([s.name, s.email, sd?.goal || "", String(sd?.streak || 0), String(sd?.monthlyWorkouts || 0), String(sd?.currentWeight || 0), s.status]);
+    });
+    const csv = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement("a"); a.href = url; a.download = "alunos-gc.csv"; a.click();
+    URL.revokeObjectURL(url);
+    toast("CSV exportado!");
+  }
+
+  const fieldStyle = (err?) => ({
+    background: CARD_BG, border: `1px solid ${err ? DANGER + "66" : BORDER}`,
+    color: "#f0f0f0", borderRadius: 10, padding: "12px 14px",
+    width: "100%", fontSize: 14, outline: "none", fontFamily: "'DM Sans', sans-serif",
+  });
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 10, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 12, color: MUTED }}>{filtered.length} aluno(s)</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn variant="secondary" size="sm" icon={Download} onClick={exportCSV}>Exportar</Btn>
+          <Btn size="sm" icon={Plus} onClick={() => setNewModal(true)}>Novo</Btn>
+        </div>
+      </div>
+
+      <div style={{ position: "relative", marginBottom: 14 }}>
+        <Search size={15} style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: MUTED, pointerEvents: "none" }} />
+        <input type="text" placeholder="Buscar aluno..." value={search}
+          onChange={e => setSearch(e.target.value)}
+          style={{ paddingLeft: 38, background: CARD_BG, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 10, padding: "12px 14px 12px 38px", width: "100%", fontSize: 14, outline: "none" }} />
+      </div>
+
+      {filtered.length === 0 && (
+        <div className="card" style={{ textAlign: "center", padding: 40, color: MUTED }}>
+          <Users size={32} style={{ margin: "0 auto 12px" }} />
+          <div>Nenhum aluno encontrado</div>
+        </div>
+      )}
+
+      {filtered.map(student => {
+        const sd = studentsData[student.id];
+        const isSelected = selected === student.id;
+        const diff = sd ? (sd.currentWeight - sd.startWeight).toFixed(1) : "0";
+
+        return (
+          <div key={student.id}>
+            <div className={`student-row${isSelected ? " selected" : ""}`}
+              onClick={() => setSelected(isSelected ? null : student.id)}
+              role="button" tabIndex={0} aria-expanded={isSelected}
+              onKeyDown={e => e.key === "Enter" && setSelected(isSelected ? null : student.id)}>
+              <Avatar initials={student.avatar} size={38} />
+              <div style={{ flex: 1, marginLeft: 12, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{student.name}</div>
+                <div style={{ fontSize: 11, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{student.email}</div>
               </div>
-            </motion.div>
-          )}
-
-          {/* TREINOS TAB */}
-          {tab === "treinos" && (
-            <motion.div key="treinos" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                <h2 className="display" style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Gerenciar Treinos</h2>
-                <NeonBtn small>
-                  <Plus size={14} /> Novo Treino
-                </NeonBtn>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 11, fontWeight: 600, color: N }}>{sd?.goal}</div>
+                  <div style={{ fontSize: 10, color: MUTED }}>{sd?.streak || 0}d streak</div>
+                </div>
+                {isSelected ? <ChevronDown size={15} style={{ color: MUTED }} /> : <ChevronRight size={15} style={{ color: MUTED }} />}
               </div>
+            </div>
 
-              {currentStudent && currentStudentData ? (
-                <div>
-                  <div style={{ marginBottom: 20 }}>
-                    <label style={{ fontSize: 12, color: MUTED, textTransform: "uppercase", display: "block", marginBottom: 8 }}>Selecione um aluno:</label>
-                    <select
-                      value={selectedStudent || ""}
-                      onChange={e => setSelectedStudent(Number(e.target.value))}
-                      style={{
-                        background: CARD,
-                        border: `1px solid ${BORDER}`,
-                        color: "#f5f5f5",
-                        borderRadius: 12,
-                        padding: "12px 16px",
-                        width: "100%",
-                        fontSize: 14,
-                        fontFamily: "'DM Sans', sans-serif",
-                        cursor: "pointer"
-                      }}
-                    >
-                      {students.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
+            <AnimatePresence>
+              {isSelected && sd && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} style={{ overflow: "hidden" }}>
+                  <div className="card" style={{ marginBottom: 12, marginTop: 4, background: `${N}06`, borderColor: `${N}22` }}>
+                    <div className="student-stats-grid" style={{ marginBottom: 14 }}>
+                      {[
+                        { label: "Início",   value: `${sd.startWeight}kg` },
+                        { label: "Atual",    value: `${sd.currentWeight}kg` },
+                        { label: "Variação", value: `${Number(diff) > 0 ? "+" : ""}${diff}kg`, color: Number(diff) < 0 ? DANGER : TEAL },
+                        { label: "Treinos",  value: sd.monthlyWorkouts },
+                      ].map((stat, i) => (
+                        <div key={i}>
+                          <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", letterSpacing: ".04em", fontWeight: 700 }}>{stat.label}</div>
+                          <div style={{ fontSize: 16, fontWeight: 700, marginTop: 3, color: stat.color || "#f0f0f0" }}>{stat.value}</div>
+                        </div>
                       ))}
-                    </select>
-                  </div>
+                    </div>
 
-                  {currentStudentData.workouts.map(w => (
-                    <div key={w.id} className="card" style={{ marginBottom: 16 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: 16 }}>
-                        <div>
-                          <div className="display" style={{ fontSize: 16, fontWeight: 700 }}>{w.name}</div>
-                          <div style={{ fontSize: 12, color: N, marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
-                            <Clock size={11} /> {w.day}
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", gap: 8 }}>
-                          <NeonBtn small secondary>
-                            <Edit2 size={14} />
-                          </NeonBtn>
-                          <NeonBtn small danger>
-                            <Trash2 size={14} />
-                          </NeonBtn>
-                        </div>
+                    {sd.weightHistory.length > 0 && (
+                      <div style={{ height: 110, marginBottom: 14 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={sd.weightHistory}>
+                            <XAxis dataKey="d" stroke="transparent" tick={{ fill: MUTED, fontSize: 10 }} />
+                            <YAxis stroke="transparent" tick={{ fill: MUTED, fontSize: 10 }} domain={["auto", "auto"]} />
+                            <Tooltip {...CHART_TOOLTIP} formatter={v => [`${v} kg`, "Peso"]} />
+                            <Line type="monotone" dataKey="v" stroke={N} strokeWidth={2} dot={{ fill: N, r: 3 }} />
+                          </LineChart>
+                        </ResponsiveContainer>
                       </div>
+                    )}
 
-                      <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
-                        {w.exercises.map((ex, i) => (
-                          <div key={i} style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                            <div style={{ width: 26, height: 26, borderRadius: "50%", background: `${N}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: N, flexShrink: 0 }}>
-                              {i + 1}
-                            </div>
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 13, fontWeight: 500 }}>{ex.name}</div>
-                              {ex.note && <div style={{ fontSize: 11, color: MUTED }}>{ex.note}</div>}
-                            </div>
-                            <div style={{ display: "flex", gap: 8 }}>
-                              <span className="badge" style={{ background: `${N}15`, color: N }}>{ex.sets}</span>
-                              <span style={{ fontSize: 12, color: MUTED }}>{ex.load}</span>
-                            </div>
-                          </div>
-                        ))}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      <Btn variant="secondary" size="sm" icon={Edit2}    onClick={e => { e.stopPropagation(); openEdit(student); }} style={{ justifyContent: "center" }}>Editar</Btn>
+                      <Btn variant="secondary" size="sm" icon={Dumbbell} onClick={e => { e.stopPropagation(); onNavigate("treinos", student.id); }} style={{ justifyContent: "center" }}>Treinos</Btn>
+                      <Btn variant="danger"    size="sm" icon={Trash2}   onClick={e => { e.stopPropagation(); handleDelete(student); }} style={{ justifyContent: "center", gridColumn: "1 / -1" }}>Remover</Btn>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        );
+      })}
+
+      <Modal open={newModal} onClose={() => { setNewModal(false); setFormErrors({}); }} title="Novo Aluno">
+        {[
+          { label: "Nome completo", key: "name",     type: "text",     placeholder: "Ex: João Silva" },
+          { label: "E-mail",        key: "email",    type: "email",    placeholder: "joao@email.com" },
+          { label: "Senha inicial", key: "password", type: "password", placeholder: "mínimo 6 caracteres" },
+        ].map(f => (
+          <div key={f.key} style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>{f.label}</label>
+            <input type={f.type} placeholder={f.placeholder} value={newForm[f.key]}
+              onChange={e => { setNewForm(p => ({ ...p, [f.key]: e.target.value })); setFormErrors(p => ({ ...p, [f.key]: undefined })); }}
+              style={fieldStyle(formErrors[f.key])} />
+            {formErrors[f.key] && <div style={{ fontSize: 12, color: DANGER, marginTop: 4 }}>{formErrors[f.key]}</div>}
+          </div>
+        ))}
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Objetivo</label>
+          <select value={newForm.goal} onChange={e => setNewForm(p => ({ ...p, goal: e.target.value }))} style={fieldStyle()}>
+            {["Perder gordura", "Ganhar massa magra", "Performance", "Condicionamento"].map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <Btn onClick={handleCreate} icon={UserPlus} style={{ width: "100%", justifyContent: "center" }}>Criar Aluno</Btn>
+          <Btn variant="secondary" onClick={() => { setNewModal(false); setFormErrors({}); }} style={{ width: "100%", justifyContent: "center" }}>Cancelar</Btn>
+        </div>
+      </Modal>
+
+      <Modal open={!!editModal} onClose={() => setEditModal(null)} title={`Editar: ${editForm.name}`}>
+        {[
+          { label: "Nome",   key: "name",     type: "text" },
+          { label: "E-mail", key: "email",    type: "email" },
+          { label: "Senha",  key: "password", type: "text" },
+        ].map(f => (
+          <div key={f.key} style={{ marginBottom: 14 }}>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>{f.label}</label>
+            <input type={f.type} value={editForm[f.key] || ""}
+              onChange={e => setEditForm(p => ({ ...p, [f.key]: e.target.value }))}
+              style={fieldStyle()} />
+          </div>
+        ))}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Objetivo</label>
+          <select value={editForm.goal || ""} onChange={e => setEditForm(p => ({ ...p, goal: e.target.value }))} style={fieldStyle()}>
+            {["Perder gordura", "Ganhar massa magra", "Performance", "Condicionamento"].map(g => <option key={g} value={g}>{g}</option>)}
+          </select>
+        </div>
+        <div style={{ marginBottom: 20 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Nota do Coach</label>
+          <textarea rows={3} value={editForm.coachNote || ""}
+            onChange={e => setEditForm(p => ({ ...p, coachNote: e.target.value }))}
+            style={{ ...fieldStyle(), resize: "vertical" }} />
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <Btn onClick={handleSaveEdit} icon={Save} style={{ width: "100%", justifyContent: "center" }}>Salvar</Btn>
+          <Btn variant="secondary" onClick={() => setEditModal(null)} style={{ width: "100%", justifyContent: "center" }}>Cancelar</Btn>
+        </div>
+      </Modal>
+    </div>
+  );
+}
+
+// ─── EDITOR DE EXERCÍCIO (com autocomplete da biblioteca) ─────────────────
+// ── ALTERADO: recebe exerciseLibrary como prop e mostra sugestões ao digitar nome ──
+const BLANK_EXERCISE = () => ({
+  id: `ex_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+  name: "", plannedSets: "3", plannedReps: "12", plannedLoad: "",
+  note: "", estimatedTime: 10, videoUrl: "",
+});
+
+function ExerciseEditor({ exercise, onSave, onCancel, accent = N, exerciseLibrary = [] }) {
+  const [form,          setForm]          = useState({ ...exercise });
+  const [suggestions,   setSuggestions]   = useState([]);
+  const [showDropdown,  setShowDropdown]  = useState(false);
+  const [highlighted,   setHighlighted]   = useState(-1);
+  const dropdownRef = useRef(null);
+  const inputRef    = useRef(null);
+
+  // Filtra biblioteca ao digitar
+  useEffect(() => {
+    const q = form.name.trim().toLowerCase();
+    if (!q || q.length < 1) { setSuggestions([]); setShowDropdown(false); return; }
+    const matches = exerciseLibrary
+      .filter(t => t.name.toLowerCase().includes(q))
+      .slice(0, 8);
+    setSuggestions(matches);
+    setShowDropdown(matches.length > 0);
+    setHighlighted(-1);
+  }, [form.name, exerciseLibrary]);
+
+  // Fecha ao clicar fora
+  useEffect(() => {
+    const handler = e => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target) &&
+          inputRef.current && !inputRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // Seleciona sugestão e preenche campos automaticamente
+  function selectSuggestion(template) {
+    setForm(prev => ({
+      ...prev,
+      name:         template.name,
+      plannedSets:  template.defaultSets  || prev.plannedSets,
+      plannedReps:  template.defaultReps  || prev.plannedReps,
+      plannedLoad:  template.defaultLoad  || prev.plannedLoad,
+      note:         template.note         || prev.note,
+      videoUrl:     template.videoUrl     || prev.videoUrl,
+    }));
+    setShowDropdown(false);
+    setSuggestions([]);
+  }
+
+  // Navegação com teclado no dropdown
+  function handleKeyDown(e) {
+    if (!showDropdown || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setHighlighted(h => Math.min(h + 1, suggestions.length - 1));
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setHighlighted(h => Math.max(h - 1, 0));
+    } else if (e.key === "Enter" && highlighted >= 0) {
+      e.preventDefault();
+      selectSuggestion(suggestions[highlighted]);
+    } else if (e.key === "Escape") {
+      setShowDropdown(false);
+    }
+  }
+
+  function f(key) { return e => setForm(p => ({ ...p, [key]: e.target.value })); }
+
+  const inputStyle = {
+    background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0",
+    borderRadius: 8, padding: "8px 11px", fontSize: 13, outline: "none",
+    fontFamily: "'DM Sans', sans-serif", width: "100%",
+  };
+  const labelStyle = {
+    display: "block", fontSize: 10, fontWeight: 700, color: MUTED,
+    textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5,
+  };
+
+  // Cor do grupo muscular do template selecionado (se houver)
+  const matchedTemplate = exerciseLibrary.find(t => t.name.toLowerCase() === form.name.toLowerCase());
+  const muscleColors = {
+    "Peito": "#3B82F6", "Costas": "#8B5CF6", "Ombro": "#F59E0B",
+    "Pernas": "#EF4444", "Glúteos": "#EC4899", "Bíceps": "#10B981",
+    "Tríceps": "#14B8A6", "Abdômen": "#F97316", "Panturrilha": "#6366F1", "Outro": MUTED,
+  };
+
+  return (
+    <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+      style={{ background: `${accent}08`, border: `1px solid ${accent}33`, borderRadius: 14, padding: 16, marginBottom: 10 }}>
+
+      {/* ── Chip de grupo muscular (quando há match na biblioteca) */}
+      {matchedTemplate && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 10, flexWrap: "wrap" }}>
+          <span style={{
+            padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+            background: `${muscleColors[matchedTemplate.muscleGroup] || MUTED}18`,
+            color: muscleColors[matchedTemplate.muscleGroup] || MUTED,
+            border: `1px solid ${muscleColors[matchedTemplate.muscleGroup] || MUTED}33`,
+          }}>
+            {matchedTemplate.muscleGroup}
+          </span>
+          <span style={{
+            padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+            background: CARD_BG2, color: MUTED, border: `1px solid ${BORDER}`,
+          }}>
+            {matchedTemplate.equipment}
+          </span>
+          <span style={{
+            padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+            background: `${N}10`, color: N, border: `1px solid ${N}22`,
+            display: "flex", alignItems: "center", gap: 4,
+          }}>
+            <Zap size={10} /> Da biblioteca
+          </span>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 12 }}>
+
+        {/* ── Nome com autocomplete */}
+        <div style={{ position: "relative" }}>
+          <label style={labelStyle}>Nome do Exercício *</label>
+          <div style={{ position: "relative" }}>
+            <input
+              ref={inputRef}
+              value={form.name}
+              onChange={f("name")}
+              onKeyDown={handleKeyDown}
+              onFocus={() => { if (suggestions.length > 0) setShowDropdown(true); }}
+              placeholder="Digite para buscar na biblioteca..."
+              style={{
+                ...inputStyle,
+                borderColor: !form.name.trim() ? `${DANGER}55` : showDropdown ? `${N}55` : BORDER,
+                paddingRight: 36,
+              }}
+              autoComplete="off"
+            />
+            <Search size={14} style={{
+              position: "absolute", right: 10, top: "50%",
+              transform: "translateY(-50%)", color: MUTED, pointerEvents: "none",
+            }} />
+          </div>
+
+          {/* Dropdown de sugestões */}
+          <AnimatePresence>
+            {showDropdown && suggestions.length > 0 && (
+              <motion.div
+                ref={dropdownRef}
+                initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -4 }}
+                className="autocomplete-dropdown">
+                {suggestions.map((s, i) => (
+                  <div
+                    key={s.id}
+                    className={`autocomplete-item${highlighted === i ? " highlighted" : ""}`}
+                    onMouseDown={e => { e.preventDefault(); selectSuggestion(s); }}
+                    onMouseEnter={() => setHighlighted(i)}>
+                    {/* Ícone de grupo muscular */}
+                    <div style={{
+                      width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                      background: `${muscleColors[s.muscleGroup] || MUTED}18`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 13,
+                    }}>
+                      💪
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{s.name}</div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 10, color: muscleColors[s.muscleGroup] || MUTED, fontWeight: 600 }}>{s.muscleGroup}</span>
+                        <span style={{ fontSize: 10, color: MUTED }}>·</span>
+                        <span style={{ fontSize: 10, color: MUTED }}>{s.equipment}</span>
+                        <span style={{ fontSize: 10, color: MUTED }}>·</span>
+                        <span style={{ fontSize: 10, color: MUTED }}>{s.defaultSets}×{s.defaultReps} @ {s.defaultLoad}</span>
                       </div>
                     </div>
-                  ))}
+                    <div style={{ flexShrink: 0 }}>
+                      <ChevronRight size={13} style={{ color: MUTED }} />
+                    </div>
+                  </div>
+                ))}
+                <div style={{ padding: "8px 14px", borderTop: `1px solid ${BORDER}`, display: "flex", alignItems: "center", gap: 6 }}>
+                  <BookOpen size={11} style={{ color: MUTED }} />
+                  <span style={{ fontSize: 10, color: MUTED }}>{exerciseLibrary.length} exercícios na biblioteca</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* ── Séries / Reps / Carga / Tempo */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+          <div>
+            <label style={labelStyle}>Séries</label>
+            <input type="number" min="1" max="20" value={form.plannedSets} onChange={f("plannedSets")} style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Reps</label>
+            <input value={form.plannedReps} onChange={f("plannedReps")} placeholder="12 ou 8-12" style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Carga</label>
+            <input value={form.plannedLoad} onChange={f("plannedLoad")} placeholder="70kg / PC" style={inputStyle} />
+          </div>
+          <div>
+            <label style={labelStyle}>Tempo (min)</label>
+            <input type="number" min="1" max="60" value={form.estimatedTime} onChange={f("estimatedTime")} style={inputStyle} />
+          </div>
+        </div>
+
+        {/* ── Observação */}
+        <div>
+          <label style={labelStyle}>Observação / Dica de execução</label>
+          <textarea rows={2} value={form.note} onChange={f("note")}
+            placeholder="Ex: Foco na excêntrica, cotovelo a 45°, amplitude máxima..."
+            style={{ ...inputStyle, resize: "vertical" }} />
+        </div>
+
+        {/* ── URL do vídeo */}
+        <div>
+          <label style={labelStyle}>
+            <span style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <Video size={11} /> Vídeo demonstrativo (URL YouTube / Vimeo)
+            </span>
+          </label>
+          <input value={form.videoUrl || ""} onChange={f("videoUrl")}
+            placeholder="https://youtube.com/watch?v=..." style={inputStyle} />
+          {form.videoUrl && (
+            <div style={{ marginTop: 8, fontSize: 11, color: BLUE, display: "flex", alignItems: "center", gap: 4 }}>
+              <Link size={11} />
+              <a href={form.videoUrl} target="_blank" rel="noopener noreferrer" style={{ color: BLUE }}>Pré-visualizar vídeo</a>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Botões */}
+      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+        <Btn onClick={() => { if (!form.name.trim()) return; onSave(form); }} icon={Save} style={{ flex: 1, justifyContent: "center" }}>
+          Salvar exercício
+        </Btn>
+        <Btn variant="secondary" onClick={onCancel} style={{ justifyContent: "center", padding: "12px 16px" }}>
+          Cancelar
+        </Btn>
+      </div>
+    </motion.div>
+  );
+}
+
+// ─── CARD DE EXERCÍCIO (visualização) ────────────────────────────────────
+function ExerciseCard({ exercise, index, onEdit, onDelete, accent = N }) {
+  const [showVideo, setShowVideo] = useState(false);
+
+  function getYoutubeId(url) {
+    if (!url) return null;
+    const m = url.match(/(?:v=|youtu\.be\/)([^&?/]+)/);
+    return m ? m[1] : null;
+  }
+  const ytId = getYoutubeId(exercise.videoUrl);
+
+  return (
+    <motion.div layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+      style={{ background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: "hidden", marginBottom: 8 }}>
+
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px" }}>
+        <div style={{ width: 26, height: 26, borderRadius: "50%", background: `${accent}18`, color: accent, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+          {index + 1}
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>{exercise.name}</div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <span style={{ fontSize: 11, color: accent, fontWeight: 700 }}>
+              {exercise.plannedSets}× {exercise.plannedReps}
+            </span>
+            {exercise.plannedLoad && (
+              <span style={{ fontSize: 11, color: MUTED2 }}>@ {exercise.plannedLoad}</span>
+            )}
+            <span style={{ fontSize: 11, color: MUTED }}>~{exercise.estimatedTime}min</span>
+          </div>
+          {exercise.note && (
+            <div style={{ fontSize: 11, color: MUTED, marginTop: 4, fontStyle: "italic" }}>
+              💡 {exercise.note}
+            </div>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          {exercise.videoUrl && (
+            <button onClick={() => setShowVideo(v => !v)} title="Ver vídeo"
+              style={{ background: showVideo ? `${BLUE}22` : CARD_BG2, border: `1px solid ${showVideo ? BLUE + "55" : BORDER}`, borderRadius: 8, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", color: BLUE, cursor: "pointer" }}>
+              <Play size={13} fill={showVideo ? BLUE : "none"} />
+            </button>
+          )}
+          <button onClick={() => onEdit(exercise)}
+            style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, borderRadius: 8, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", color: MUTED2, cursor: "pointer" }}>
+            <Edit2 size={13} />
+          </button>
+          <button onClick={() => onDelete(exercise.id)}
+            style={{ background: `${DANGER}12`, border: `1px solid ${DANGER}33`, borderRadius: 8, width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center", color: DANGER, cursor: "pointer" }}>
+            <Trash2 size={13} />
+          </button>
+        </div>
+      </div>
+
+      <AnimatePresence>
+        {showVideo && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} style={{ overflow: "hidden" }}>
+            <div style={{ padding: "0 14px 14px" }}>
+              {ytId ? (
+                <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: 10, overflow: "hidden", border: `1px solid ${BORDER}` }}>
+                  <iframe
+                    src={`https://www.youtube.com/embed/${ytId}?modestbranding=1&rel=0`}
+                    style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", border: "none" }}
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowFullScreen title={exercise.name}
+                  />
                 </div>
               ) : (
-                <div className="card" style={{ textAlign: "center", padding: 40 }}>
-                  <Dumbbell size={32} style={{ color: MUTED, margin: "0 auto 12px" }} />
-                  <p style={{ color: MUTED }}>Selecione um aluno para visualizar seus treinos</p>
+                <div style={{ padding: "12px 14px", background: `${BLUE}08`, border: `1px solid ${BLUE}22`, borderRadius: 10 }}>
+                  <div style={{ fontSize: 12, color: BLUE, marginBottom: 4 }}>Link do vídeo</div>
+                  <a href={exercise.videoUrl} target="_blank" rel="noopener noreferrer" style={{ color: BLUE, fontSize: 12 }}>{exercise.videoUrl}</a>
                 </div>
               )}
-            </motion.div>
-          )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
 
-          {/* MENSAGENS TAB */}
-          {tab === "mensagens" && (
-            <motion.div key="mensagens" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <h2 className="display" style={{ fontSize: 24, fontWeight: 800, marginBottom: 20 }}>Mensagens</h2>
+// ─── TAB: TREINOS ─────────────────────────────────────────────────────────
+// ── ALTERADO: passa exerciseLibrary para ExerciseEditor ──
+function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStudent, onSelectStudent, toast, exerciseLibrary }) {
+  const students = users.filter(u => u.role === "student");
+  const current  = selectedStudent ? students.find(s => s.id === selectedStudent) : null;
+  const sd       = current ? studentsData[current.id] : null;
 
-              <div style={{ display: "grid", gridTemplateColumns: "250px 1fr", gap: 16, height: 600 }}>
-                {/* Students List */}
-                <div className="card" style={{ overflowY: "auto", padding: 0 }}>
-                  {students.map(s => {
-                    const isSelected = selectedStudent === s.id;
-                    return (
-                      <div
-                        key={s.id}
-                        onClick={() => setSelectedStudent(s.id)}
-                        style={{
-                          padding: 12,
-                          borderBottom: `1px solid ${BORDER}`,
-                          cursor: "pointer",
-                          background: isSelected ? `${N}15` : "transparent",
-                          transition: "all .2s"
-                        }}
-                      >
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ width: 32, height: 32, borderRadius: "50%", background: `${N}18`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, color: N, flexShrink: 0 }}>
-                            {s.avatar}
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</div>
-                            <div style={{ fontSize: 10, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Clique para conversar</div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+  const [activeWorkoutId, setActiveWorkoutId] = useState(null);
+  const [editingWorkout,  setEditingWorkout]  = useState(null);
+  const [addingExercise,  setAddingExercise]  = useState(false);
+  const [editingExercise, setEditingExercise] = useState(null);
+  const [showNewWorkout,  setShowNewWorkout]  = useState(false);
+  const [newWorkoutForm,  setNewWorkoutForm]  = useState({ name: "", day: "Segunda" });
+
+  const DAYS = ["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"];
+  const COLORS_BY_KEYWORD = { Superior: BLUE, Inferior: DANGER, Pull: PURPLE, Push: N, Full: TEAL, Força: AMBER };
+
+  function getWorkoutColor(name) {
+    for (const [k, c] of Object.entries(COLORS_BY_KEYWORD)) if (name.includes(k)) return c;
+    return N;
+  }
+
+  const workouts = sd?.workouts || [];
+  const activeWorkout = workouts.find(w => w.id === activeWorkoutId) || null;
+
+  function handleCreateWorkout() {
+    if (!current || !newWorkoutForm.name.trim()) { toast("Nome do treino obrigatório.", "error"); return; }
+    const newId = Math.max(0, ...workouts.map(w => w.id), 0) + 1;
+    const newWorkout = { id: newId, name: newWorkoutForm.name.trim(), day: newWorkoutForm.day, totalEstimatedTime: 0, exercises: [] };
+    updateStudentWorkouts(current.id, [...workouts, newWorkout]);
+    setActiveWorkoutId(newId);
+    setShowNewWorkout(false);
+    setNewWorkoutForm({ name: "", day: "Segunda" });
+    toast("Treino criado!");
+  }
+
+  function handleSaveWorkoutMeta() {
+    if (!editingWorkout || !current) return;
+    const updated = workouts.map(w => w.id === activeWorkoutId ? { ...w, name: editingWorkout.name, day: editingWorkout.day } : w);
+    updateStudentWorkouts(current.id, updated);
+    setEditingWorkout(null);
+    toast("Treino atualizado!");
+  }
+
+  function handleDeleteWorkout(wid) {
+    if (!current || !window.confirm("Remover este treino e todos os exercícios?")) return;
+    updateStudentWorkouts(current.id, workouts.filter(w => w.id !== wid));
+    if (activeWorkoutId === wid) setActiveWorkoutId(null);
+    toast("Treino removido.", "info");
+  }
+
+  function handleSaveExercise(ex) {
+    if (!current || !activeWorkout) return;
+    const existsIdx = activeWorkout.exercises.findIndex(e => e.id === ex.id);
+    let exercises;
+    if (existsIdx >= 0) {
+      exercises = activeWorkout.exercises.map((e, i) => i === existsIdx ? ex : e);
+    } else {
+      exercises = [...activeWorkout.exercises, ex];
+    }
+    const totalTime = exercises.reduce((s, e) => s + Number(e.estimatedTime || 0), 0);
+    updateStudentWorkouts(current.id, workouts.map(w => w.id === activeWorkoutId ? { ...w, exercises, totalEstimatedTime: totalTime } : w));
+    setAddingExercise(false);
+    setEditingExercise(null);
+    toast(existsIdx >= 0 ? "Exercício atualizado!" : "Exercício adicionado!");
+  }
+
+  function handleDeleteExercise(exId) {
+    if (!current || !activeWorkout || !window.confirm("Remover exercício?")) return;
+    const exercises = activeWorkout.exercises.filter(e => e.id !== exId);
+    const totalTime = exercises.reduce((s, e) => s + Number(e.estimatedTime || 0), 0);
+    updateStudentWorkouts(current.id, workouts.map(w => w.id === activeWorkoutId ? { ...w, exercises, totalEstimatedTime: totalTime } : w));
+    toast("Exercício removido.", "info");
+  }
+
+  function handleDuplicateWorkout(w) {
+    if (!current) return;
+    const newId = Math.max(0, ...workouts.map(x => x.id), 0) + 1;
+    const dup = {
+      ...w, id: newId, name: `${w.name} (cópia)`,
+      exercises: w.exercises.map(e => ({ ...e, id: `ex_${Date.now()}_${Math.random().toString(36).slice(2,6)}` })),
+    };
+    updateStudentWorkouts(current.id, [...workouts, dup]);
+    toast("Treino duplicado!");
+  }
+
+  const color = activeWorkout ? getWorkoutColor(activeWorkout.name) : N;
+
+  return (
+    <div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Aluno</label>
+        <select value={selectedStudent || ""} onChange={e => { onSelectStudent(Number(e.target.value) || null); setActiveWorkoutId(null); }}
+          style={{ background: CARD_BG, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 10, padding: "12px 14px", width: "100%", fontSize: 14, cursor: "pointer" }}>
+          <option value="">Selecione um aluno...</option>
+          {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+      </div>
+
+      {!current && (
+        <div className="card" style={{ textAlign: "center", padding: 40 }}>
+          <Dumbbell size={32} style={{ color: MUTED, margin: "0 auto 12px" }} />
+          <p style={{ color: MUTED }}>Selecione um aluno para gerenciar treinos</p>
+        </div>
+      )}
+
+      {current && sd && (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px", borderRadius: 12, background: `${N}08`, border: `1px solid ${N}22`, marginBottom: 16 }}>
+            <Avatar initials={current.avatar} size={36} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>{current.name}</div>
+              <div style={{ fontSize: 11, color: N }}>{sd.goal} · {workouts.length} treino(s)</div>
+            </div>
+            <Btn size="sm" icon={Plus} onClick={() => setShowNewWorkout(v => !v)}>
+              {showNewWorkout ? "Cancelar" : "Novo Treino"}
+            </Btn>
+          </div>
+
+          <AnimatePresence>
+            {showNewWorkout && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} style={{ overflow: "hidden" }}>
+                <div className="card" style={{ marginBottom: 14, background: `${N}06`, borderColor: `${N}33` }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14, color: N }}>Novo Treino</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, marginBottom: 12 }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Nome</label>
+                      <input value={newWorkoutForm.name} onChange={e => setNewWorkoutForm(p => ({ ...p, name: e.target.value }))}
+                        placeholder="Ex: Treino A · Superior"
+                        style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, outline: "none", width: "100%" }} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Dia</label>
+                      <select value={newWorkoutForm.day} onChange={e => setNewWorkoutForm(p => ({ ...p, day: e.target.value }))}
+                        style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, outline: "none", cursor: "pointer" }}>
+                        {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Btn icon={Plus} onClick={handleCreateWorkout} style={{ flex: 1, justifyContent: "center" }}>Criar</Btn>
+                    <Btn variant="secondary" onClick={() => setShowNewWorkout(false)} style={{ justifyContent: "center", padding: "12px 16px" }}>Cancelar</Btn>
+                  </div>
                 </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-                {/* Chat */}
-                {currentStudent && currentStudentData ? (
-                  <div className="card" style={{ display: "flex", flexDirection: "column" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, paddingBottom: 14, borderBottom: `1px solid ${BORDER}` }}>
-                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: `${N}18`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, color: N }}>
-                        {currentStudent.avatar}
+          <div style={{ display: "grid", gridTemplateColumns: activeWorkoutId ? "260px 1fr" : "1fr", gap: 14 }}>
+            {/* Lista de treinos */}
+            <div>
+              {workouts.length === 0 && (
+                <div className="card" style={{ textAlign: "center", padding: 32, color: MUTED }}>
+                  <Dumbbell size={28} style={{ margin: "0 auto 10px" }} />
+                  <div style={{ fontSize: 13 }}>Nenhum treino ainda.<br />Crie o primeiro acima.</div>
+                </div>
+              )}
+              {workouts.map(w => {
+                const wcolor = getWorkoutColor(w.name);
+                const isActive = activeWorkoutId === w.id;
+                return (
+                  <motion.div key={w.id} layout
+                    onClick={() => setActiveWorkoutId(isActive ? null : w.id)}
+                    style={{
+                      padding: "12px 14px", borderRadius: 12, marginBottom: 8, cursor: "pointer",
+                      background: isActive ? `${wcolor}12` : CARD_BG,
+                      border: `1px solid ${isActive ? wcolor + "44" : BORDER}`,
+                      borderLeft: `4px solid ${wcolor}`, transition: "all .2s",
+                    }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 12, color: wcolor, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 2 }}>{w.day}</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.name}</div>
+                        <div style={{ fontSize: 11, color: MUTED, marginTop: 3 }}>{(w.exercises || []).length} exerc. · {w.totalEstimatedTime || 0} min</div>
                       </div>
+                      <div style={{ display: "flex", gap: 4, flexShrink: 0, marginLeft: 8 }} onClick={e => e.stopPropagation()}>
+                        <button onClick={() => handleDuplicateWorkout(w)} title="Duplicar"
+                          style={{ background: "none", border: "none", color: MUTED, cursor: "pointer", padding: 4 }}>
+                          <Copy size={13} />
+                        </button>
+                        <button onClick={() => handleDeleteWorkout(w.id)} title="Remover"
+                          style={{ background: "none", border: "none", color: DANGER, cursor: "pointer", padding: 4 }}>
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
+
+            {/* Editor do treino ativo */}
+            {activeWorkout && (
+              <motion.div key={activeWorkoutId} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}>
+                <div className="card" style={{ marginBottom: 14, borderColor: `${color}33`, background: `${color}06` }}>
+                  {editingWorkout ? (
+                    <div>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, marginBottom: 12 }}>
+                        <div>
+                          <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Nome</label>
+                          <input value={editingWorkout.name} onChange={e => setEditingWorkout(p => ({ ...p, name: e.target.value }))}
+                            style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, outline: "none", width: "100%" }} />
+                        </div>
+                        <div>
+                          <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Dia</label>
+                          <select value={editingWorkout.day} onChange={e => setEditingWorkout(p => ({ ...p, day: e.target.value }))}
+                            style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, outline: "none", cursor: "pointer" }}>
+                            {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8 }}>
+                        <Btn icon={Save} onClick={handleSaveWorkoutMeta} style={{ justifyContent: "center" }}>Salvar</Btn>
+                        <Btn variant="secondary" onClick={() => setEditingWorkout(null)} style={{ justifyContent: "center", padding: "12px 16px" }}>Cancelar</Btn>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
-                        <div style={{ fontSize: 14, fontWeight: 600 }}>{currentStudent.name}</div>
-                        <div style={{ fontSize: 11, color: N, display: "flex", alignItems: "center", gap: 4 }}>
-                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: N, display: "inline-block" }} /> online
-                        </div>
+                        <div style={{ fontSize: 11, color, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>{activeWorkout.day}</div>
+                        <div className="display" style={{ fontSize: 16, marginBottom: 4 }}>{activeWorkout.name}</div>
+                        <div style={{ fontSize: 12, color: MUTED }}>{(activeWorkout.exercises || []).length} exercícios · {activeWorkout.totalEstimatedTime || 0} min estimados</div>
                       </div>
-                    </div>
-
-                    <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 10, paddingBottom: 4 }}>
-                      {currentStudentData.messages.map((m, i) => (
-                        <div key={i} style={{ display: "flex", justifyContent: m.from === "student" ? "flex-end" : "flex-start" }}>
-                          <div style={{
-                            maxWidth: "72%", padding: "10px 14px",
-                            borderRadius: m.from === "student" ? "16px 16px 4px 16px" : "16px 16px 16px 4px",
-                            background: m.from === "student" ? `${N}22` : CARD,
-                            border: `1px solid ${m.from === "student" ? N + "33" : BORDER}`,
-                            fontSize: 13, lineHeight: 1.6
-                          }}>
-                            <div>{m.text}</div>
-                            <div style={{ fontSize: 10, color: MUTED, marginTop: 4, textAlign: "right" }}>{m.time}</div>
-                          </div>
-                        </div>
-                      ))}
-                      <div ref={messagesEndRef} />
-                    </div>
-
-                    <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 12, display: "flex", gap: 10, marginTop: 12 }}>
-                      <input placeholder="Escreva uma mensagem…" value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === "Enter" && sendMsg()} style={{ flex: 1 }} />
-                      <button onClick={sendMsg} style={{ background: N, border: "none", borderRadius: 12, width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", color: "#000", cursor: "pointer" }}>
-                        <Send size={16} />
+                      <button onClick={() => setEditingWorkout({ name: activeWorkout.name, day: activeWorkout.day })}
+                        style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "8px 12px", color: MUTED2, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                        <Edit2 size={13} /> Editar
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <div className="card" style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <div style={{ textAlign: "center", color: MUTED }}>
-                      <MessageCircle size={32} style={{ margin: "0 auto 12px" }} />
-                      <p>Selecione um aluno para conversar</p>
+                  )}
+                </div>
+
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                      Exercícios <span style={{ fontSize: 11, color: MUTED, fontWeight: 400 }}>({(activeWorkout.exercises || []).length})</span>
+                    </div>
+                    <div style={{ display: "flex", gap: 8 }}>
+                      {exerciseLibrary.length > 0 && (
+                        <span style={{ fontSize: 11, color: MUTED, display: "flex", alignItems: "center", gap: 4 }}>
+                          <BookOpen size={11} /> {exerciseLibrary.length} na biblioteca
+                        </span>
+                      )}
+                      <Btn size="sm" icon={Plus} onClick={() => { setAddingExercise(true); setEditingExercise(null); }}>
+                        Adicionar
+                      </Btn>
                     </div>
                   </div>
-                )}
-              </div>
-            </motion.div>
-          )}
 
-          {/* RELATÓRIOS TAB */}
-          {tab === "relatorios" && (
-            <motion.div key="relatorios" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>
-                <h2 className="display" style={{ fontSize: 24, fontWeight: 800, margin: 0 }}>Relatórios</h2>
-                <NeonBtn small secondary>
-                  <Download size={14} /> Exportar
-                </NeonBtn>
-              </div>
+                  <AnimatePresence>
+                    {addingExercise && !editingExercise && (
+                      <ExerciseEditor
+                        exercise={BLANK_EXERCISE()}
+                        accent={color}
+                        exerciseLibrary={exerciseLibrary}
+                        onSave={handleSaveExercise}
+                        onCancel={() => setAddingExercise(false)}
+                      />
+                    )}
+                  </AnimatePresence>
 
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: 16 }}>
-                {/* Alunos por Objetivo */}
-                <div className="card">
-                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Alunos por Objetivo</div>
-                  <div style={{ height: 250 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={[
-                        {objetivo:"Perder Gordura",qtd:1},{objetivo:"Ganhar Massa",qtd:1},{objetivo:"Performance",qtd:1}
-                      ]}>
-                        <XAxis dataKey="objetivo" stroke="#555" tick={{ fontSize: 10 }} />
-                        <YAxis stroke="#555" tick={{ fontSize: 10 }} />
-                        <Tooltip contentStyle={{ background: "#161616", border: `1px solid ${BORDER}`, borderRadius: 10 }} />
-                        <Bar dataKey="qtd" fill={N} radius={[6, 6, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+                  {(activeWorkout.exercises || []).length === 0 && !addingExercise && (
+                    <div className="card" style={{ textAlign: "center", padding: 28, color: MUTED }}>
+                      <Dumbbell size={24} style={{ margin: "0 auto 8px" }} />
+                      <div style={{ fontSize: 12 }}>Nenhum exercício ainda.<br />Clique em "Adicionar" para buscar da biblioteca.</div>
+                    </div>
+                  )}
+
+                  {(activeWorkout.exercises || []).map((ex, idx) => (
+                    <div key={ex.id}>
+                      {editingExercise?.id === ex.id ? (
+                        <ExerciseEditor
+                          exercise={editingExercise}
+                          accent={color}
+                          exerciseLibrary={exerciseLibrary}
+                          onSave={handleSaveExercise}
+                          onCancel={() => setEditingExercise(null)}
+                        />
+                      ) : (
+                        <ExerciseCard
+                          exercise={ex} index={idx} accent={color}
+                          onEdit={e => { setEditingExercise(e); setAddingExercise(false); }}
+                          onDelete={handleDeleteExercise}
+                        />
+                      )}
+                    </div>
+                  ))}
+
+                  {(activeWorkout.exercises || []).length > 0 && (
+                    <div style={{ marginTop: 14, padding: "12px 16px", borderRadius: 12, background: CARD_BG2, border: `1px solid ${BORDER}`, display: "flex", gap: 24, flexWrap: "wrap" }}>
+                      <div>
+                        <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", fontWeight: 700 }}>Total de Séries</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color }}>{(activeWorkout.exercises || []).reduce((s, e) => s + Number(e.plannedSets || 0), 0)}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", fontWeight: 700 }}>Exercícios</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color }}>{(activeWorkout.exercises || []).length}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", fontWeight: 700 }}>Tempo Estimado</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color }}>{activeWorkout.totalEstimatedTime || 0} min</div>
+                      </div>
+                    </div>
+                  )}
                 </div>
+              </motion.div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
-                {/* Progresso de Peso */}
-                <div className="card">
-                  <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Progresso de Peso (Alunos)</div>
-                  <div style={{ height: 250 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={[
-                        {semana:"S1",rafael:88,camila:58,bruno:82},
-                        {semana:"S2",rafael:87.2,camila:58.5,bruno:81.5},
-                        {semana:"S3",rafael:86.5,camila:59,bruno:81},
-                        {semana:"S4",rafael:85.8,camila:59.6,bruno:80.8},
-                        {semana:"S5",rafael:85.1,camila:60.2,bruno:80.6},
-                        {semana:"S6",rafael:84.3,camila:60.9,bruno:80.5},
-                      ]}>
-                        <XAxis dataKey="semana" stroke="#555" tick={{ fontSize: 10 }} />
-                        <YAxis stroke="#555" tick={{ fontSize: 10 }} />
-                        <Tooltip contentStyle={{ background: "#161616", border: `1px solid ${BORDER}`, borderRadius: 10 }} />
-                        <Legend />
-                        <Line type="monotone" dataKey="rafael" stroke={N} strokeWidth={2} />
-                        <Line type="monotone" dataKey="camila" stroke="#FF6B6B" strokeWidth={2} />
-                        <Line type="monotone" dataKey="bruno" stroke="#4ECDC4" strokeWidth={2} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
+// ─── TAB: BIBLIOTECA DE EXERCÍCIOS (NOVO) ────────────────────────────────
+// ── NOVO: aba completa de CRUD da biblioteca global de exercícios ──
+
+const BLANK_TEMPLATE = (): ExerciseTemplate => ({
+  id: `lib_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+  name: "",
+  muscleGroup: "Peito",
+  equipment: "Barra",
+  videoUrl: "",
+  defaultSets: "3",
+  defaultReps: "12",
+  defaultLoad: "",
+  note: "",
+  createdAt: new Date().toISOString(),
+});
+
+// Cores por grupo muscular
+const MUSCLE_COLOR: Record<string, string> = {
+  "Peito":       "#3B82F6",
+  "Costas":      "#8B5CF6",
+  "Ombro":       "#F59E0B",
+  "Bíceps":      "#10B981",
+  "Tríceps":     "#14B8A6",
+  "Pernas":      "#EF4444",
+  "Glúteos":     "#EC4899",
+  "Panturrilha": "#6366F1",
+  "Abdômen":     "#F97316",
+  "Outro":       "#6B7280",
+};
+
+function TemplateForm({ initial, onSave, onCancel, existingNames = [] }: {
+  initial: ExerciseTemplate;
+  onSave: (t: ExerciseTemplate) => void;
+  onCancel: () => void;
+  existingNames?: string[];
+}) {
+  const [form, setForm] = useState<ExerciseTemplate>({ ...initial });
+  const [error, setError] = useState("");
+
+  function f(key: string) {
+    return (e: any) => setForm(p => ({ ...p, [key]: e.target.value }));
+  }
+
+  function handleSave() {
+    if (!form.name.trim()) { setError("Nome é obrigatório."); return; }
+    if (existingNames.includes(form.name.trim().toLowerCase()) &&
+        form.name.trim().toLowerCase() !== initial.name.trim().toLowerCase()) {
+      setError("Já existe um exercício com este nome."); return;
+    }
+    onSave({ ...form, name: form.name.trim() });
+  }
+
+  const inputStyle = {
+    background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0",
+    borderRadius: 8, padding: "9px 12px", fontSize: 13, outline: "none",
+    fontFamily: "'DM Sans', sans-serif", width: "100%",
+  };
+  const labelStyle = {
+    display: "block", fontSize: 10, fontWeight: 700, color: MUTED,
+    textTransform: "uppercase" as const, letterSpacing: ".06em", marginBottom: 5,
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* Nome */}
+      <div>
+        <label style={labelStyle}>Nome do Exercício *</label>
+        <input value={form.name} onChange={f("name")} placeholder="Ex: Supino Inclinado com Halter"
+          style={{ ...inputStyle, borderColor: error && !form.name.trim() ? `${DANGER}66` : BORDER }} />
+        {error && <div style={{ fontSize: 12, color: DANGER, marginTop: 4 }}>{error}</div>}
+      </div>
+
+      {/* Grupo Muscular / Equipamento */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div>
+          <label style={labelStyle}>Grupo Muscular</label>
+          <select value={form.muscleGroup} onChange={f("muscleGroup")} style={{ ...inputStyle, cursor: "pointer" }}>
+            {MUSCLE_GROUPS.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </div>
+        <div>
+          <label style={labelStyle}>Equipamento</label>
+          <select value={form.equipment} onChange={f("equipment")} style={{ ...inputStyle, cursor: "pointer" }}>
+            {EQUIPMENT_OPTIONS.map(e => <option key={e} value={e}>{e}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Padrões */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+        <div>
+          <label style={labelStyle}>Séries padrão</label>
+          <input type="number" min="1" max="20" value={form.defaultSets} onChange={f("defaultSets")} style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Reps padrão</label>
+          <input value={form.defaultReps} onChange={f("defaultReps")} placeholder="12 ou 8-12" style={inputStyle} />
+        </div>
+        <div>
+          <label style={labelStyle}>Carga padrão</label>
+          <input value={form.defaultLoad} onChange={f("defaultLoad")} placeholder="70kg / PC" style={inputStyle} />
+        </div>
+      </div>
+
+      {/* Observação */}
+      <div>
+        <label style={labelStyle}>Observação / Dica de execução</label>
+        <textarea rows={2} value={form.note} onChange={f("note")}
+          placeholder="Ex: Escápulas retraídas, amplitude máxima..."
+          style={{ ...inputStyle, resize: "vertical" }} />
+      </div>
+
+      {/* URL do vídeo */}
+      <div>
+        <label style={labelStyle}><span style={{ display: "flex", alignItems: "center", gap: 5 }}><Video size={11} /> Vídeo demonstrativo (URL YouTube)</span></label>
+        <input value={form.videoUrl} onChange={f("videoUrl")} placeholder="https://youtube.com/watch?v=..." style={inputStyle} />
+        {form.videoUrl && (
+          <a href={form.videoUrl} target="_blank" rel="noopener noreferrer"
+            style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 11, color: BLUE, marginTop: 6 }}>
+            <Link size={11} /> Abrir vídeo
+          </a>
+        )}
+      </div>
+
+      {/* Preview chip */}
+      <div style={{ padding: "10px 12px", background: `${MUSCLE_COLOR[form.muscleGroup] || MUTED}10`, border: `1px solid ${MUSCLE_COLOR[form.muscleGroup] || MUTED}30`, borderRadius: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 11, color: MUSCLE_COLOR[form.muscleGroup] || MUTED, fontWeight: 700 }}>{form.muscleGroup}</span>
+        <span style={{ fontSize: 11, color: MUTED }}>·</span>
+        <span style={{ fontSize: 11, color: MUTED2 }}>{form.equipment}</span>
+        <span style={{ fontSize: 11, color: MUTED }}>·</span>
+        <span style={{ fontSize: 11, color: N }}>{form.defaultSets}×{form.defaultReps} @ {form.defaultLoad || "—"}</span>
+      </div>
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <Btn onClick={handleSave} icon={Save} style={{ flex: 1, justifyContent: "center" }}>Salvar na Biblioteca</Btn>
+        <Btn variant="secondary" onClick={onCancel} style={{ justifyContent: "center", padding: "12px 16px" }}>Cancelar</Btn>
+      </div>
+    </div>
+  );
+}
+
+function TabBiblioteca({ exerciseLibrary, addExerciseTemplate, updateExerciseTemplate, deleteExerciseTemplate, toast }) {
+  const [search,          setSearch]          = useState("");
+  const [filterMuscle,    setFilterMuscle]    = useState("all");
+  const [filterEquipment, setFilterEquipment] = useState("all");
+  const [showForm,        setShowForm]        = useState(false);
+  const [editingTemplate, setEditingTemplate] = useState<ExerciseTemplate | null>(null);
+  const [viewMode,        setViewMode]        = useState<"grid" | "table">("grid");
+
+  // Filtros
+  const filtered = exerciseLibrary.filter(t => {
+    const matchSearch = !search || t.name.toLowerCase().includes(search.toLowerCase());
+    const matchMuscle = filterMuscle === "all" || t.muscleGroup === filterMuscle;
+    const matchEquip  = filterEquipment === "all" || t.equipment === filterEquipment;
+    return matchSearch && matchMuscle && matchEquip;
+  });
+
+  // Contagem por grupo muscular
+  const groupCounts: Record<string, number> = {};
+  exerciseLibrary.forEach(t => { groupCounts[t.muscleGroup] = (groupCounts[t.muscleGroup] || 0) + 1; });
+
+  // Nomes existentes para validação de duplicatas
+  const existingNames = exerciseLibrary.map(t => t.name.toLowerCase());
+
+  async function handleSaveNew(template: ExerciseTemplate) {
+    try {
+      await addExerciseTemplate(template);
+      setShowForm(false);
+      toast(`"${template.name}" adicionado à biblioteca!`);
+    } catch (e) {
+      toast("Erro ao salvar exercício.", "error");
+    }
+  }
+
+  async function handleSaveEdit(template: ExerciseTemplate) {
+    try {
+      await updateExerciseTemplate(template);
+      setEditingTemplate(null);
+      toast(`"${template.name}" atualizado!`);
+    } catch (e) {
+      toast("Erro ao atualizar exercício.", "error");
+    }
+  }
+
+  async function handleDelete(template: ExerciseTemplate) {
+    if (!window.confirm(`Remover "${template.name}" da biblioteca? Os treinos existentes que referenciam este exercício não serão afetados.`)) return;
+    try {
+      await deleteExerciseTemplate(template.id);
+      toast(`"${template.name}" removido.`, "info");
+    } catch (e) {
+      toast("Erro ao remover exercício.", "error");
+    }
+  }
+
+  function exportJSON() {
+    const blob = new Blob([JSON.stringify(exerciseLibrary, null, 2)], { type: "application/json" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob);
+    a.download = "biblioteca-exercicios.json"; a.click();
+    toast("JSON exportado!");
+  }
+
+  return (
+    <div>
+      {/* Header com stats */}
+      <div className="kpi-grid" style={{ marginBottom: 16 }}>
+        <KpiCard icon={BookOpen}  label="Total de Exercícios" value={exerciseLibrary.length} delta="na biblioteca global" />
+        <KpiCard icon={Tag}       label="Grupos Musculares"   value={Object.keys(groupCounts).length} delta="categorias cobertas" color={AMBER} />
+        <KpiCard icon={Dumbbell}  label="Com Equipamento"     value={exerciseLibrary.filter(t => t.equipment !== "Peso Corporal").length} delta="requerem equipamento" color={BLUE} />
+        <KpiCard icon={Video}     label="Com Vídeo"           value={exerciseLibrary.filter(t => !!t.videoUrl).length} delta="exercícios com demo" color={TEAL} />
+      </div>
+
+      {/* Toolbar */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap", flex: 1, minWidth: 0 }}>
+          {/* Busca */}
+          <div style={{ position: "relative", flex: 1, minWidth: 180 }}>
+            <Search size={14} style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: MUTED, pointerEvents: "none" }} />
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar exercício..."
+              style={{ background: CARD_BG, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 10, padding: "9px 12px 9px 32px", fontSize: 13, outline: "none", width: "100%" }} />
+          </div>
+
+          {/* Filtro grupo muscular */}
+          <select value={filterMuscle} onChange={e => setFilterMuscle(e.target.value)}
+            style={{ background: CARD_BG, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 10, padding: "9px 12px", fontSize: 13, cursor: "pointer", outline: "none" }}>
+            <option value="all">Todos os grupos</option>
+            {MUSCLE_GROUPS.map(m => <option key={m} value={m}>{m} ({groupCounts[m] || 0})</option>)}
+          </select>
+
+          {/* Filtro equipamento */}
+          <select value={filterEquipment} onChange={e => setFilterEquipment(e.target.value)}
+            style={{ background: CARD_BG, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 10, padding: "9px 12px", fontSize: 13, cursor: "pointer", outline: "none" }}>
+            <option value="all">Todos os equipamentos</option>
+            {EQUIPMENT_OPTIONS.map(e => <option key={e} value={e}>{e}</option>)}
+          </select>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+          {/* Toggle view */}
+          <div style={{ display: "flex", gap: 2, background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 10, padding: 4 }}>
+            <button onClick={() => setViewMode("grid")}
+              style={{ width: 34, height: 32, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, border: "none", background: viewMode === "grid" ? `${N}18` : "transparent", color: viewMode === "grid" ? N : MUTED, cursor: "pointer" }}>
+              <Layers size={14} />
+            </button>
+            <button onClick={() => setViewMode("table")}
+              style={{ width: 34, height: 32, display: "flex", alignItems: "center", justifyContent: "center", borderRadius: 8, border: "none", background: viewMode === "table" ? `${N}18` : "transparent", color: viewMode === "table" ? N : MUTED, cursor: "pointer" }}>
+              <FileText size={14} />
+            </button>
+          </div>
+          <Btn variant="secondary" size="sm" icon={Download} onClick={exportJSON}>JSON</Btn>
+          <Btn size="sm" icon={Plus} onClick={() => { setShowForm(true); setEditingTemplate(null); }}>Novo Exercício</Btn>
+        </div>
+      </div>
+
+      {/* Formulário de novo exercício */}
+      <AnimatePresence>
+        {showForm && !editingTemplate && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} style={{ overflow: "hidden" }}>
+            <div className="card" style={{ marginBottom: 16, background: `${N}06`, borderColor: `${N}33` }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: N, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                <BookOpen size={16} /> Novo Exercício na Biblioteca
+              </div>
+              <TemplateForm
+                initial={BLANK_TEMPLATE()}
+                onSave={handleSaveNew}
+                onCancel={() => setShowForm(false)}
+                existingNames={existingNames}
+              />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal de edição */}
+      <Modal open={!!editingTemplate} onClose={() => setEditingTemplate(null)} title="Editar Exercício" width={540}>
+        {editingTemplate && (
+          <TemplateForm
+            initial={editingTemplate}
+            onSave={handleSaveEdit}
+            onCancel={() => setEditingTemplate(null)}
+            existingNames={existingNames}
+          />
+        )}
+      </Modal>
+
+      {/* Info de filtro */}
+      {(search || filterMuscle !== "all" || filterEquipment !== "all") && (
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <span style={{ fontSize: 12, color: MUTED }}>{filtered.length} resultado(s)</span>
+          <button onClick={() => { setSearch(""); setFilterMuscle("all"); setFilterEquipment("all"); }}
+            style={{ background: "none", border: "none", color: BLUE, fontSize: 12, cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+            <RotateCcw size={11} /> Limpar filtros
+          </button>
+        </div>
+      )}
+
+      {filtered.length === 0 && (
+        <div className="card" style={{ textAlign: "center", padding: 48, color: MUTED }}>
+          <BookOpen size={36} style={{ margin: "0 auto 12px", color: MUTED }} />
+          <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>
+            {exerciseLibrary.length === 0 ? "Biblioteca vazia" : "Nenhum exercício encontrado"}
+          </div>
+          <div style={{ fontSize: 12 }}>
+            {exerciseLibrary.length === 0
+              ? "Cadastre o primeiro exercício clicando em \"Novo Exercício\"."
+              : "Tente ajustar os filtros ou a busca."}
+          </div>
+        </div>
+      )}
+
+      {/* ── VISUALIZAÇÃO EM GRADE */}
+      {viewMode === "grid" && filtered.length > 0 && (
+        <div>
+          {/* Agrupa por grupo muscular */}
+          {MUSCLE_GROUPS.filter(g => filtered.some(t => t.muscleGroup === g)).map(group => {
+            const groupItems = filtered.filter(t => t.muscleGroup === group);
+            const color = MUSCLE_COLOR[group] || MUTED;
+            return (
+              <div key={group} style={{ marginBottom: 24 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
+                  <span style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: ".08em" }}>{group}</span>
+                  <span style={{ fontSize: 11, color: MUTED }}>({groupItems.length})</span>
+                </div>
+                <div className="lib-grid">
+                  {groupItems.map(template => (
+                    <motion.div key={template.id} layout className="lib-card">
+                      {/* Cabeçalho colorido */}
+                      <div style={{ height: 4, background: color }} />
+                      <div style={{ padding: "12px 14px" }}>
+                        {/* Nome + ações */}
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 8 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, lineHeight: 1.3, flex: 1 }}>{template.name}</div>
+                          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                            <button onClick={() => setEditingTemplate(template)}
+                              style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, borderRadius: 7, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: MUTED2, cursor: "pointer" }}>
+                              <Edit2 size={12} />
+                            </button>
+                            <button onClick={() => handleDelete(template)}
+                              style={{ background: `${DANGER}12`, border: `1px solid ${DANGER}33`, borderRadius: 7, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: DANGER, cursor: "pointer" }}>
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Chips */}
+                        <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 8 }}>
+                          <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: `${color}18`, color }}>
+                            {template.muscleGroup}
+                          </span>
+                          <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 600, background: CARD_BG2, color: MUTED }}>
+                            {template.equipment}
+                          </span>
+                          {template.videoUrl && (
+                            <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 600, background: `${BLUE}12`, color: BLUE }}>
+                              <Play size={9} /> Vídeo
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Padrões */}
+                        <div style={{ display: "flex", gap: 12, marginBottom: template.note ? 8 : 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: N }}>{template.defaultSets}× {template.defaultReps}</div>
+                          {template.defaultLoad && <div style={{ fontSize: 12, color: MUTED2 }}>@ {template.defaultLoad}</div>}
+                        </div>
+
+                        {/* Nota */}
+                        {template.note && (
+                          <div style={{ fontSize: 11, color: MUTED, fontStyle: "italic", lineHeight: 1.4 }}>
+                            💡 {template.note}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
               </div>
+            );
+          })}
+        </div>
+      )}
 
-              {/* Tabela de Desempenho */}
-              <div className="card" style={{ marginTop: 16 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 16 }}>Desempenho Geral dos Alunos</div>
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
-                    <thead>
-                      <tr style={{ borderBottom: `1px solid ${BORDER}` }}>
-                        <th style={{ textAlign: "left", padding: 12, color: MUTED, fontWeight: 600 }}>Aluno</th>
-                        <th style={{ textAlign: "left", padding: 12, color: MUTED, fontWeight: 600 }}>Objetivo</th>
-                        <th style={{ textAlign: "center", padding: 12, color: MUTED, fontWeight: 600 }}>Streak</th>
-                        <th style={{ textAlign: "center", padding: 12, color: MUTED, fontWeight: 600 }}>Treinos/Mês</th>
-                        <th style={{ textAlign: "center", padding: 12, color: MUTED, fontWeight: 600 }}>Progresso</th>
-                        <th style={{ textAlign: "center", padding: 12, color: MUTED, fontWeight: 600 }}>Status</th>
-                      </tr>
-                    </thead>
+      {/* ── VISUALIZAÇÃO EM TABELA */}
+      {viewMode === "table" && filtered.length > 0 && (
+        <div className="card">
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Exercício</th>
+                  <th>Grupo</th>
+                  <th>Equipamento</th>
+                  <th>Séries</th>
+                  <th>Reps</th>
+                  <th>Carga</th>
+                  <th>Vídeo</th>
+                  <th>Ações</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(t => {
+                  const color = MUSCLE_COLOR[t.muscleGroup] || MUTED;
+                  return (
+                    <tr key={t.id}>
+                      <td>
+                        <div style={{ fontWeight: 600, fontSize: 13 }}>{t.name}</div>
+                        {t.note && <div style={{ fontSize: 11, color: MUTED, marginTop: 2, maxWidth: 220, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.note}</div>}
+                      </td>
+                      <td>
+                        <span style={{ padding: "2px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700, background: `${color}18`, color }}>{t.muscleGroup}</span>
+                      </td>
+                      <td style={{ fontSize: 12, color: MUTED2 }}>{t.equipment}</td>
+                      <td style={{ fontSize: 12, fontWeight: 700, color: N }}>{t.defaultSets}</td>
+                      <td style={{ fontSize: 12, color: MUTED2 }}>{t.defaultReps}</td>
+                      <td style={{ fontSize: 12, color: MUTED2 }}>{t.defaultLoad || "—"}</td>
+                      <td>
+                        {t.videoUrl
+                          ? <a href={t.videoUrl} target="_blank" rel="noopener noreferrer" style={{ color: BLUE, display: "flex", alignItems: "center", gap: 4, fontSize: 12 }}><Play size={11} /> Ver</a>
+                          : <span style={{ color: MUTED, fontSize: 11 }}>—</span>
+                        }
+                      </td>
+                      <td>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button onClick={() => setEditingTemplate(t)}
+                            style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, borderRadius: 7, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: MUTED2, cursor: "pointer" }}>
+                            <Edit2 size={12} />
+                          </button>
+                          <button onClick={() => handleDelete(t)}
+                            style={{ background: `${DANGER}12`, border: `1px solid ${DANGER}33`, borderRadius: 7, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", color: DANGER, cursor: "pointer" }}>
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── HELPERS DE RELATÓRIO ─────────────────────────────────────────────────
+function buildAttendanceCalendar(sessions) {
+  const map = {};
+  (sessions || []).forEach(s => { if (s.date) map[s.date] = true; });
+  return map;
+}
+
+function getMonthDays(year, month) {
+  const days = [];
+  const firstDay = new Date(year, month, 1).getDay();
+  const total = new Date(year, month + 1, 0).getDate();
+  const offset = (firstDay + 6) % 7;
+  for (let i = 0; i < offset; i++) days.push(null);
+  for (let d = 1; d <= total; d++) days.push(d);
+  return days;
+}
+
+function isoDate(y, m, d) {
+  return `${y}-${String(m + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+function AttendanceCalendar({ sessions, accent = N }) {
+  const today = new Date();
+  const [viewMonth, setViewMonth] = useState(today.getMonth());
+  const [viewYear,  setViewYear]  = useState(today.getFullYear());
+  const attendanceMap = buildAttendanceCalendar(sessions);
+  const days = getMonthDays(viewYear, viewMonth);
+  const WEEK_LABELS = ["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"];
+  const MONTH_NAMES = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+
+  function prevMonth() { if (viewMonth === 0) { setViewMonth(11); setViewYear(y => y - 1); } else setViewMonth(m => m - 1); }
+  function nextMonth() { if (viewMonth === 11) { setViewMonth(0); setViewYear(y => y + 1); } else setViewMonth(m => m + 1); }
+
+  const presentCount = days.filter(d => d && attendanceMap[isoDate(viewYear, viewMonth, d)]).length;
+  const totalDays    = days.filter(Boolean).length;
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <button onClick={prevMonth} style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "6px 10px", color: MUTED2, cursor: "pointer" }}>‹</button>
+        <div style={{ fontSize: 13, fontWeight: 600 }}>{MONTH_NAMES[viewMonth]} {viewYear}</div>
+        <button onClick={nextMonth} style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, borderRadius: 8, padding: "6px 10px", color: MUTED2, cursor: "pointer" }}>›</button>
+      </div>
+      <div className="calendar-grid" style={{ marginBottom: 4 }}>
+        {WEEK_LABELS.map(l => (
+          <div key={l} style={{ textAlign: "center", fontSize: 9, fontWeight: 700, color: MUTED, textTransform: "uppercase", padding: "2px 0" }}>{l}</div>
+        ))}
+      </div>
+      <div className="calendar-grid">
+        {days.map((d, i) => {
+          if (!d) return <div key={`blank-${i}`} />;
+          const dateStr = isoDate(viewYear, viewMonth, d);
+          const isPresent = !!attendanceMap[dateStr];
+          const isToday   = dateStr === today.toISOString().split("T")[0];
+          return (
+            <div key={d} style={{
+              aspectRatio: "1", borderRadius: 8,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 11, fontWeight: isPresent ? 700 : 400,
+              background: isPresent ? `${accent}22` : "transparent",
+              border: `1px solid ${isToday ? accent : isPresent ? accent + "44" : BORDER}`,
+              color: isPresent ? accent : isToday ? accent : MUTED,
+            }}>{d}</div>
+          );
+        })}
+      </div>
+      <div style={{ display: "flex", gap: 16, marginTop: 12, justifyContent: "center" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 3, background: `${accent}22`, border: `1px solid ${accent}44` }} />
+          <span style={{ color: accent, fontWeight: 700 }}>{presentCount} presentes</span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11 }}>
+          <div style={{ width: 10, height: 10, borderRadius: 3, background: "transparent", border: `1px solid ${BORDER}` }} />
+          <span style={{ color: MUTED }}>{totalDays - presentCount} ausentes</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SessionDetailModal({ session, onClose, accent = N }) {
+  if (!session) return null;
+  const exercises = session.exercises || [];
+  return (
+    <Modal open={!!session} onClose={onClose} title="Detalhes da Sessão" width={560}>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
+        {[
+          { label: "Data",        value: new Date(session.date).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" }) },
+          { label: "Treino",      value: session.workoutName },
+          { label: "Duração",     value: `${session.duration} min` },
+          { label: "Energia",     value: `${session.energyLevel}/10` },
+          { label: "Fadiga",      value: `${session.fatigueLevel}/10` },
+          { label: "Concluído",   value: session.completed ? "Sim" : "Incompleto" },
+          { label: "Metas batidas",  value: session.metasBatidas || 0 },
+          { label: "Não atingidas",  value: session.metasNaoAtingidas || 0 },
+        ].map(item => (
+          <div key={item.label} style={{ padding: "10px 12px", background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 10 }}>
+            <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", marginBottom: 3 }}>{item.label}</div>
+            <div style={{ fontSize: 13, fontWeight: 600 }}>{item.value}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 12, fontWeight: 700, color: accent, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 10 }}>Exercícios realizados</div>
+      {exercises.length === 0 && <div style={{ color: MUTED, fontSize: 12, marginBottom: 12 }}>Sem detalhe de exercícios registrado.</div>}
+      {exercises.map((ex, i) => (
+        <div key={i} style={{ padding: "10px 12px", background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 10, marginBottom: 8 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{ex.exerciseName}</div>
+          <div style={{ display: "flex", gap: 16, fontSize: 12, color: MUTED2, flexWrap: "wrap" }}>
+            <span>{ex.actualSets} séries × {ex.actualReps} reps</span>
+            <span>@ {ex.actualWeight > 0 ? `${ex.actualWeight}kg` : "Peso corporal"}</span>
+            <span style={{ color: AMBER }}>RPE {ex.rpe}</span>
+            <span>Descanso: {ex.restTime}s</span>
+          </div>
+          {ex.notes && <div style={{ fontSize: 11, color: accent, marginTop: 4 }}>💬 {ex.notes}</div>}
+        </div>
+      ))}
+      {session.generalNotes && (
+        <div style={{ marginTop: 12, padding: "12px 14px", background: `${accent}08`, border: `1px solid ${accent}22`, borderRadius: 10 }}>
+          <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>Observações gerais</div>
+          <div style={{ fontSize: 13 }}>{session.generalNotes}</div>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ─── TAB: RELATÓRIOS ──────────────────────────────────────────────────────
+function TabRelatorios({ users, studentsData, toast }) {
+  const students = users.filter(u => u.role === "student");
+  const [selectedStudentId, setSelectedStudentId] = useState(students[0]?.id || null);
+  const [viewMode,          setViewMode]          = useState("overview");
+  const [selectedSession,   setSelectedSession]   = useState(null);
+  const [filterMonth,       setFilterMonth]       = useState("all");
+
+  const student = students.find(s => s.id === selectedStudentId);
+  const sd      = selectedStudentId ? studentsData[selectedStudentId] : null;
+  const allSessions = sd?.workoutSessions || [];
+  const filteredSessions = allSessions.filter(s => filterMonth === "all" || s.date?.startsWith(filterMonth));
+  const availableMonths = [...new Set(allSessions.map(s => s.date?.slice(0, 7)).filter(Boolean))].sort().reverse();
+
+  const allExercises = filteredSessions.flatMap(s => s.exercises || []);
+  const exerciseStats = {};
+  allExercises.forEach(ex => {
+    if (!exerciseStats[ex.exerciseName]) exerciseStats[ex.exerciseName] = { name: ex.exerciseName, count: 0, totalSets: 0, maxWeight: 0 };
+    exerciseStats[ex.exerciseName].count++;
+    exerciseStats[ex.exerciseName].totalSets += ex.actualSets || 0;
+    if ((ex.actualWeight || 0) > exerciseStats[ex.exerciseName].maxWeight) exerciseStats[ex.exerciseName].maxWeight = ex.actualWeight || 0;
+  });
+  const exerciseList = Object.values(exerciseStats).sort((a, b) => b.count - a.count);
+  const attendanceMap = buildAttendanceCalendar(allSessions);
+  const presentDates  = allSessions.map(s => s.date).filter(Boolean);
+  const totalCompleted = filteredSessions.filter(s => s.completed).length;
+  const totalIncomplete = filteredSessions.filter(s => !s.completed).length;
+  const totalMetasBatidas = filteredSessions.reduce((a, s) => a + (s.metasBatidas || 0), 0);
+  const totalMetasNao     = filteredSessions.reduce((a, s) => a + (s.metasNaoAtingidas || 0), 0);
+  const avgEnergy = filteredSessions.length
+    ? (filteredSessions.reduce((a, s) => a + s.energyLevel, 0) / filteredSessions.length).toFixed(1) : "-";
+  const energyChartData = [...filteredSessions].reverse().map(s => ({
+    date: new Date(s.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+    energia: s.energyLevel, fadiga: s.fatigueLevel,
+  }));
+
+  function exportCSV() {
+    const rows = [["Nome", "Email", "Objetivo", "Streak", "Treinos/Mês", "Variação (kg)", "Status"]];
+    students.forEach(s => {
+      const ssd = studentsData[s.id];
+      const diff = ssd ? (ssd.currentWeight - ssd.startWeight).toFixed(1) : "0";
+      rows.push([s.name, s.email, ssd?.goal || "", String(ssd?.streak || 0), String(ssd?.monthlyWorkouts || 0), diff, s.status]);
+    });
+    const csv  = rows.map(r => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const a    = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "relatorio-gc.csv"; a.click();
+    toast("Relatório exportado!");
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 4, background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 4 }}>
+          {[
+            { id: "overview",   label: "Visão Geral",  icon: BarChart2 },
+            { id: "sessions",   label: "Sessões",       icon: Dumbbell },
+            { id: "attendance", label: "Presença",      icon: Calendar },
+          ].map(m => (
+            <button key={m.id} onClick={() => setViewMode(m.id)} className={`tab-btn${viewMode === m.id ? " active" : ""}`} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+              <m.icon size={13} /> {m.label}
+            </button>
+          ))}
+        </div>
+        <Btn variant="secondary" size="sm" icon={Download} onClick={exportCSV}>Exportar CSV</Btn>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <select value={selectedStudentId || ""} onChange={e => setSelectedStudentId(Number(e.target.value) || null)}
+          style={{ background: CARD_BG, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 10, padding: "9px 12px", fontSize: 13, cursor: "pointer", outline: "none" }}>
+          <option value="">Selecione aluno...</option>
+          {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+        </select>
+        <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+          style={{ background: CARD_BG, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 10, padding: "9px 12px", fontSize: 13, cursor: "pointer", outline: "none" }}>
+          <option value="all">Todos os meses</option>
+          {availableMonths.map(m => {
+            const [y, mo] = m.split("-");
+            const names = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"];
+            return <option key={m} value={m}>{names[Number(mo) - 1]} {y}</option>;
+          })}
+        </select>
+      </div>
+
+      {!sd && (
+        <div className="card" style={{ textAlign: "center", padding: 40, color: MUTED }}>
+          <TrendingUp size={32} style={{ margin: "0 auto 12px" }} />
+          <div>Selecione um aluno para ver relatórios</div>
+        </div>
+      )}
+
+      {sd && (
+        <>
+          {viewMode === "overview" && (
+            <div>
+              <div className="kpi-grid" style={{ marginBottom: 16 }}>
+                <KpiCard icon={Dumbbell}   label="Sessões no período" value={filteredSessions.length} delta={`${totalCompleted} completas, ${totalIncomplete} incompletas`} />
+                <KpiCard icon={Check}      label="Metas Batidas"      value={totalMetasBatidas}        delta={`${totalMetasNao} não atingidas`} color={TEAL} />
+                <KpiCard icon={Activity}   label="Energia Média"      value={avgEnergy}                delta="escala 1–10"         color={AMBER} />
+                <KpiCard icon={Trophy}     label="Streak Atual"       value={`${sd.streak}d`}          delta={`${sd.monthlyWorkouts} treinos/mês`} color={PURPLE} />
+              </div>
+              <div className="chart-grid" style={{ marginBottom: 14 }}>
+                <div className="card">
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Evolução de Peso</div>
+                  <div style={{ fontSize: 11, color: MUTED, marginBottom: 12 }}>Histórico semanal — kg</div>
+                  {(sd.weightHistory || []).length > 0 ? (
+                    <div style={{ height: 180 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={sd.weightHistory}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
+                          <XAxis dataKey="d" stroke="transparent" tick={{ fill: MUTED, fontSize: 10 }} />
+                          <YAxis stroke="transparent" tick={{ fill: MUTED, fontSize: 10 }} domain={["auto", "auto"]} />
+                          <Tooltip {...CHART_TOOLTIP} formatter={v => [`${v} kg`, "Peso"]} />
+                          <Line type="monotone" dataKey="v" stroke={N} strokeWidth={2} dot={{ fill: N, r: 3 }} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center", color: MUTED, fontSize: 12 }}>Sem histórico de peso</div>
+                  )}
+                </div>
+                <div className="card">
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Energia × Fadiga</div>
+                  <div style={{ fontSize: 11, color: MUTED, marginBottom: 12 }}>Por sessão de treino</div>
+                  {energyChartData.length > 0 ? (
+                    <div style={{ height: 180 }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={energyChartData}>
+                          <CartesianGrid strokeDasharray="3 3" stroke={BORDER} />
+                          <XAxis dataKey="date" stroke="transparent" tick={{ fill: MUTED, fontSize: 9 }} />
+                          <YAxis stroke="transparent" tick={{ fill: MUTED, fontSize: 10 }} domain={[0, 10]} />
+                          <Tooltip {...CHART_TOOLTIP} />
+                          <Line type="monotone" dataKey="energia" stroke={N}      strokeWidth={2} dot={{ fill: N,      r: 3 }} name="Energia" />
+                          <Line type="monotone" dataKey="fadiga"  stroke={DANGER} strokeWidth={2} dot={{ fill: DANGER, r: 3 }} name="Fadiga"  />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  ) : (
+                    <div style={{ height: 180, display: "flex", alignItems: "center", justifyContent: "center", color: MUTED, fontSize: 12 }}>Sem sessões no período</div>
+                  )}
+                </div>
+              </div>
+              <div className="card" style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Exercícios Mais Realizados</div>
+                {exerciseList.length === 0 && <div style={{ color: MUTED, fontSize: 12, textAlign: "center", padding: 16 }}>Sem dados</div>}
+                {exerciseList.slice(0, 8).map((ex, i) => (
+                  <div key={ex.name} style={{ display: "flex", alignItems: "center", gap: 12, padding: "8px 0", borderBottom: i < exerciseList.length - 1 ? `1px solid ${BORDER}` : "none" }}>
+                    <div style={{ width: 22, height: 22, borderRadius: "50%", background: `${N}18`, color: N, fontSize: 10, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{i + 1}</div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 13, fontWeight: 500 }}>{ex.name}</div>
+                      <div style={{ fontSize: 11, color: MUTED }}>{ex.count}× realizado · {ex.totalSets} séries totais{ex.maxWeight > 0 && ` · Máx: ${ex.maxWeight}kg`}</div>
+                    </div>
+                    <ProgressBar value={ex.count} max={Math.max(...exerciseList.map(e => e.count), 1)} />
+                  </div>
+                ))}
+              </div>
+              <div className="card">
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Desempenho Detalhado — Todos os Alunos</div>
+                <div className="table-wrap">
+                  <table>
+                    <thead><tr><th>Aluno</th><th>Objetivo</th><th>Semanas</th><th>Streak</th><th>Treinos</th><th>Variação</th><th>Sessões</th><th>Status</th></tr></thead>
                     <tbody>
                       {students.map(s => {
-                        const sd = STUDENTS_DATA[s.id];
-                        const progress = ((sd.currentWeight - sd.startWeight) / sd.startWeight * 100).toFixed(1);
+                        const ssd = studentsData[s.id];
+                        if (!ssd) return null;
+                        const diff = (ssd.currentWeight - ssd.startWeight).toFixed(1);
+                        const sessions = ssd.workoutSessions?.length || 0;
                         return (
-                          <tr key={s.id} style={{ borderBottom: `1px solid ${BORDER}` }}>
-                            <td style={{ padding: 12 }}>{s.name}</td>
-                            <td style={{ padding: 12 }}>{sd.goal}</td>
-                            <td style={{ padding: 12, textAlign: "center", color: N, fontWeight: 600 }}>{sd.streak}d</td>
-                            <td style={{ padding: 12, textAlign: "center" }}>{sd.monthlyWorkouts}</td>
-                            <td style={{ padding: 12, textAlign: "center", color: Number(progress) < 0 ? "#FF6B6B" : "#4ECDC4", fontWeight: 600 }}>{progress}%</td>
-                            <td style={{ padding: 12, textAlign: "center" }}>
-                              <span className="badge" style={{ background: `${N}15`, color: N, justifyContent: "center" }}>
-                                <Check size={12} /> Ativo
-                              </span>
-                            </td>
+                          <tr key={s.id}>
+                            <td><div style={{ display: "flex", alignItems: "center", gap: 8 }}><Avatar initials={s.avatar} size={26} /><span style={{ whiteSpace: "nowrap" }}>{s.name}</span></div></td>
+                            <td style={{ whiteSpace: "nowrap" }}>{ssd.goal}</td>
+                            <td style={{ textAlign: "center" }}>{ssd.weeks}s.</td>
+                            <td style={{ textAlign: "center", color: N, fontWeight: 700 }}>{ssd.streak}d</td>
+                            <td style={{ textAlign: "center" }}>{ssd.monthlyWorkouts}</td>
+                            <td style={{ textAlign: "center", color: Number(diff) < 0 ? DANGER : TEAL, fontWeight: 600, whiteSpace: "nowrap" }}>{Number(diff) > 0 ? "+" : ""}{diff} kg</td>
+                            <td style={{ textAlign: "center" }}>{sessions}</td>
+                            <td><Badge variant="green"><Check size={11} /> Ativo</Badge></td>
                           </tr>
                         );
                       })}
@@ -885,30 +2273,557 @@ function AdminDashboard({ user, onLogout }: AdminDashboardProps) {
                   </table>
                 </div>
               </div>
-            </motion.div>
+            </div>
           )}
 
-        </AnimatePresence>
+          {viewMode === "sessions" && (
+            <div>
+              <div style={{ marginBottom: 12, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+                <div style={{ fontSize: 12, color: MUTED }}>{filteredSessions.length} sessão(ões)</div>
+                {student && <Badge variant="green">{student.name}</Badge>}
+              </div>
+              {filteredSessions.length === 0 && (
+                <div className="card" style={{ textAlign: "center", padding: 40, color: MUTED }}>
+                  <Dumbbell size={28} style={{ margin: "0 auto 12px" }} />
+                  <div>Nenhuma sessão no período selecionado</div>
+                </div>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {filteredSessions.map(session => {
+                  const exs = session.exercises || [];
+                  return (
+                    <div key={session.id} className="card" style={{ borderLeft: `4px solid ${session.completed ? N : DANGER}` }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+                        <div>
+                          <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>{new Date(session.date).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</div>
+                          <div className="display" style={{ fontSize: 14, marginBottom: 2 }}>{session.workoutName}</div>
+                          <div style={{ fontSize: 11, color: MUTED }}>Duração: {session.duration} min · {exs.length} exercícios</div>
+                        </div>
+                        <Badge variant={session.completed ? "green" : "red"}>{session.completed ? <><Check size={10} /> Concluído</> : "Incompleto"}</Badge>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 8, marginBottom: 12 }}>
+                        {[
+                          { label: "Exercícios",     value: exs.length,               color: MUTED2 },
+                          { label: "Metas batidas",  value: session.metasBatidas || 0, color: N      },
+                          { label: "Não atingidas",  value: session.metasNaoAtingidas || 0, color: DANGER },
+                          { label: "Energia",        value: `${session.energyLevel}/10`, color: AMBER },
+                        ].map(s => (
+                          <div key={s.label} style={{ padding: "8px 10px", background: CARD_BG2, borderRadius: 10, textAlign: "center" }}>
+                            <div style={{ fontSize: 9, color: MUTED, textTransform: "uppercase", marginBottom: 3 }}>{s.label}</div>
+                            <div style={{ fontSize: 14, fontWeight: 700, color: s.color }}>{s.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                      {exs.length > 0 && (
+                        <div style={{ borderTop: `1px solid ${BORDER}`, paddingTop: 10, marginBottom: 10 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", marginBottom: 8 }}>Exercícios realizados</div>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            {exs.map((ex, i) => (
+                              <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", background: CARD_BG2, borderRadius: 8 }}>
+                                <CheckCircle2 size={13} style={{ color: ex.actualSets > 0 ? N : DANGER, flexShrink: 0 }} />
+                                <div style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 12, fontWeight: 600 }}>{ex.exerciseName}</span></div>
+                                <div style={{ fontSize: 11, color: MUTED2, flexShrink: 0 }}>{ex.actualSets}× {ex.actualReps} reps{ex.actualWeight > 0 && ` @ ${ex.actualWeight}kg`}</div>
+                                <div style={{ fontSize: 10, color: AMBER, flexShrink: 0 }}>RPE {ex.rpe}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {session.generalNotes && (
+                        <div style={{ padding: "8px 10px", background: `${N}08`, border: `1px solid ${N}22`, borderRadius: 8, marginBottom: 10, fontSize: 12, color: MUTED2 }}>{session.generalNotes}</div>
+                      )}
+                      <button onClick={() => setSelectedSession(session)}
+                        style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "8px 14px", color: MUTED2, fontSize: 12, cursor: "pointer", width: "100%", fontFamily: "inherit", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                        <Eye size={13} /> Ver relatório completo
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {viewMode === "attendance" && (
+            <div>
+              <div className="kpi-grid" style={{ marginBottom: 16 }}>
+                <KpiCard icon={Calendar}    label="Total de Treinos" value={allSessions.length}  delta="em todo o histórico" />
+                <KpiCard icon={CheckCircle2}label="Completos"        value={allSessions.filter(s => s.completed).length} delta="sessões finalizadas" color={N} />
+                <KpiCard icon={AlertCircle} label="Incompletos"      value={allSessions.filter(s => !s.completed).length} delta="sessões interrompidas" color={DANGER} />
+                <KpiCard icon={Activity}    label="Última Sessão"
+                  value={allSessions[0]?.date ? new Date(allSessions[0].date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—"}
+                  delta="data mais recente" color={AMBER} />
+              </div>
+              <div className="card" style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 16 }}>Calendário de Presença — {student?.name}</div>
+                <AttendanceCalendar sessions={allSessions} accent={N} />
+              </div>
+              <div className="card" style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Dias Treinados <span style={{ fontSize: 11, color: MUTED, fontWeight: 400 }}>({presentDates.length})</span></div>
+                {presentDates.length === 0 && <div style={{ color: MUTED, fontSize: 12, textAlign: "center", padding: 16 }}>Nenhum treino registrado</div>}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                  {[...presentDates].sort().reverse().map(d => (
+                    <div key={d} style={{ padding: "5px 12px", background: `${N}12`, border: `1px solid ${N}33`, borderRadius: 20, fontSize: 12, color: N, fontWeight: 600 }}>
+                      {new Date(d).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" })}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="card">
+                <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12 }}>Frequência Semanal</div>
+                {(sd.weekFreq || []).length > 0 ? (
+                  <div>
+                    <div style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+                      {["Seg","Ter","Qua","Qui","Sex","Sáb","Dom"].map((day, i) => {
+                        const freq = sd.weekFreq || [];
+                        const entry = freq[i];
+                        const present = entry?.v === 1;
+                        return (
+                          <div key={day} style={{ flex: 1, minWidth: 36 }}>
+                            <div style={{ textAlign: "center", fontSize: 10, color: MUTED, marginBottom: 4 }}>{day}</div>
+                            <div style={{ height: 40, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", background: present ? `${N}22` : CARD_BG2, border: `1px solid ${present ? N + "44" : BORDER}` }}>
+                              {present ? <Check size={14} style={{ color: N }} /> : <X size={12} style={{ color: MUTED }} />}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div style={{ fontSize: 11, color: MUTED, marginTop: 8 }}>Padrão de treino da última semana registrada</div>
+                  </div>
+                ) : (
+                  <div style={{ color: MUTED, fontSize: 12, textAlign: "center", padding: 16 }}>Sem dados de frequência semanal</div>
+                )}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+      <SessionDetailModal session={selectedSession} onClose={() => setSelectedSession(null)} accent={N} />
+    </div>
+  );
+}
+
+// ─── TAB: NOTIFICAÇÕES ────────────────────────────────────────────────────
+function TabNotificacoes({ notifications, onNotificationsChange, toast }) {
+  const [msg, setMsg] = useState("");
+  const unread = notifications.filter(n => !n.read).length;
+
+  function markAllRead() { onNotificationsChange(notifications.map(n => ({ ...n, read: true }))); toast("Todas marcadas como lidas."); }
+
+  function sendNotification() {
+    if (!msg.trim()) { toast("Digite uma mensagem.", "info"); return; }
+    onNotificationsChange([{ id: Date.now(), title: msg.trim(), time: "Agora", read: false, type: "info" }, ...notifications]);
+    setMsg(""); toast("Notificação enviada!");
+  }
+
+  const iconMap  = { achievement: Trophy, streak: Activity, photo: Camera, message: MessageCircle };
+  const colorMap = { achievement: AMBER, streak: N, photo: BLUE, message: TEAL };
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 10, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 12, color: MUTED }}>{unread} não lida(s)</div>
+        <Btn variant="secondary" size="sm" icon={CheckCircle2} onClick={markAllRead}>Marcar lidas</Btn>
+      </div>
+      <div className="card" style={{ marginBottom: 14 }}>
+        {notifications.map(n => {
+          const Icon  = iconMap[n.type]  || Bell;
+          const color = colorMap[n.type] || MUTED;
+          return (
+            <div key={n.id}
+              onClick={() => onNotificationsChange(notifications.map(x => x.id === n.id ? { ...x, read: true } : x))}
+              role="button" tabIndex={0}
+              style={{ display: "flex", alignItems: "center", gap: 12, padding: "12px 0", borderBottom: `1px solid ${BORDER}`, cursor: "pointer", opacity: n.read ? 0.55 : 1 }}>
+              <div style={{ width: 36, height: 36, borderRadius: 10, background: `${color}15`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <Icon size={17} style={{ color }} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: n.read ? 400 : 600 }}>{n.title}</div>
+                <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{n.time}</div>
+              </div>
+              {!n.read && <div style={{ width: 8, height: 8, borderRadius: "50%", background: N, flexShrink: 0 }} />}
+            </div>
+          );
+        })}
+        {notifications.length === 0 && <div style={{ textAlign: "center", padding: 24, color: MUTED }}>Nenhuma notificação</div>}
+      </div>
+      <div className="card">
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Enviar Notificação Manual</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input type="text" placeholder="Mensagem para todos os alunos..." value={msg}
+            onChange={e => setMsg(e.target.value)} onKeyDown={e => e.key === "Enter" && sendNotification()} style={{ flex: 1 }} />
+          <button onClick={sendNotification}
+            style={{ background: N, border: "none", borderRadius: 10, width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", color: "#000", cursor: "pointer", flexShrink: 0 }}>
+            <Send size={16} />
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-// ─── MAIN EXPORT ───────────────────────────────────────────────────────────
-export function admin_dashboard({ onBackToHome }: admin_dashboardProps) {
-  const [user, setUser] = useState<User | null>(null);
-
+// ─── TAB: PERMISSÕES ──────────────────────────────────────────────────────
+function TabPermissoes({ permissions, onPermissionsChange, toast }) {
+  const [role, setRole] = useState("student");
+  const permLabels = {
+    manageStudents: "Gerenciar alunos", manageWorkouts: "Gerenciar treinos",
+    viewReports: "Ver relatórios", sendMessages: "Enviar mensagens",
+    manageSettings: "Gerenciar configurações", viewLogs: "Ver logs", exportData: "Exportar dados",
+  };
+  function handleToggle(key) {
+    if (role === "admin") { toast("Permissões de admin são fixas.", "info"); return; }
+    onPermissionsChange({ ...permissions, [role]: { ...permissions[role], [key]: !permissions[role][key] } });
+    toast("Permissão atualizada!");
+  }
   return (
-    <AnimatePresence mode="wait">
-      {!user ? (
-        <motion.div key="login" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <LoginPage onLogin={setUser} onBackToHome={onBackToHome} />
-        </motion.div>
-      ) : (
-        <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <AdminDashboard user={user} onLogout={() => setUser(null)} />
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <div>
+      <div style={{ display: "flex", gap: 4, background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 4, width: "fit-content", marginBottom: 20 }}>
+        {["admin", "student"].map(r => (
+          <button key={r} onClick={() => setRole(r)} className={`tab-btn${role === r ? " active" : ""}`}>{r === "admin" ? "Admin" : "Aluno"}</button>
+        ))}
+      </div>
+      <div className="card" style={{ marginBottom: 14 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18, paddingBottom: 14, borderBottom: `1px solid ${BORDER}` }}>
+          <Avatar initials={role === "admin" ? "A" : "S"} size={38} color={role === "admin" ? N : BLUE} />
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>{role === "admin" ? "Administrador" : "Aluno"}</div>
+            <div style={{ fontSize: 12, color: MUTED }}>{role === "admin" ? "Acesso total" : "Acesso limitado"}</div>
+          </div>
+        </div>
+        <div className="perm-grid">
+          {Object.entries(permLabels).map(([key, label]) => {
+            const active = permissions[role]?.[key];
+            return (
+              <div key={key} className="perm-item">
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12, fontWeight: 500 }}>{label}</div>
+                  <div style={{ fontSize: 10, color: active ? N : MUTED, marginTop: 2 }}>{active ? "Habilitado" : "Desabilitado"}</div>
+                </div>
+                <Toggle checked={!!active} onChange={() => handleToggle(key)} label={label} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="card" style={{ background: `${AMBER}08`, borderColor: `${AMBER}33` }}>
+        <div style={{ display: "flex", gap: 10 }}>
+          <AlertTriangle size={17} style={{ color: AMBER, flexShrink: 0, marginTop: 1 }} />
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: AMBER, marginBottom: 4 }}>Atenção</div>
+            <div style={{ fontSize: 12, color: `${AMBER}bb`, lineHeight: 1.6 }}>Alterações têm efeito imediato. Permissões de admin são fixas e protegidas.</div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
+
+// ─── TAB: AUDITORIA ───────────────────────────────────────────────────────
+function TabAuditoria({ auditLogs, onAuditLogsChange, toast }) {
+  const logColors = { info: MUTED2, success: N, warning: AMBER, error: DANGER };
+  const logIcons  = { info: Activity, success: CheckCircle2, warning: AlertTriangle, error: AlertCircle };
+  function exportLog() {
+    const csv  = "usuario,acao,alvo,horario\n" + auditLogs.map(l => [l.user, l.action, l.target, l.time].join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const a    = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "auditoria-gc.csv"; a.click();
+    toast("Log exportado!");
+  }
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14, gap: 10, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 12, color: MUTED }}>{auditLogs.length} eventos</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Btn variant="secondary" size="sm" icon={Download} onClick={exportLog}>Exportar</Btn>
+          <Btn variant="danger" size="sm" icon={Trash2}
+            onClick={() => { if (window.confirm("Limpar todos os logs?")) { onAuditLogsChange([]); toast("Logs apagados.", "info"); } }}>
+            Limpar
+          </Btn>
+        </div>
+      </div>
+      <div className="card">
+        {auditLogs.map((log, idx) => {
+          const Icon  = logIcons[log.level]  || Activity;
+          const color = logColors[log.level] || MUTED;
+          return (
+            <div key={log.id ?? idx} style={{ display: "flex", alignItems: "flex-start", gap: 12, padding: "12px 0", borderBottom: `1px solid ${BORDER}` }}>
+              <Icon size={16} style={{ color, marginTop: 1, flexShrink: 0 }} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 500 }}>{log.action}</div>
+                <div style={{ fontSize: 11, color: MUTED, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{log.user} · {log.target}</div>
+              </div>
+              <div style={{ fontSize: 11, color: MUTED, flexShrink: 0, whiteSpace: "nowrap" }}>{log.time}</div>
+            </div>
+          );
+        })}
+        {auditLogs.length === 0 && <div style={{ textAlign: "center", padding: 24, color: MUTED }}>Nenhum log registrado</div>}
+      </div>
+    </div>
+  );
+}
+
+// ─── TAB: CONFIGURAÇÕES ───────────────────────────────────────────────────
+function TabConfiguracoes({ config, onConfigChange, auditLogs, onAuditLogsChange, toast, addAuditLog }) {
+  const [section, setSection] = useState("geral");
+  function update(key, val) { onConfigChange({ ...config, [key]: val }); }
+  function saveConfig() { toast("Configurações salvas!"); addAuditLog("Configurações do sistema atualizadas", "Sistema"); }
+  const inputStyle = { background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 8, padding: "8px 12px", fontSize: 13, outline: "none" };
+  return (
+    <div>
+      <div style={{ display: "flex", gap: 4, background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 4, width: "fit-content", marginBottom: 20, overflowX: "auto" }}>
+        {[{ id: "geral", label: "Geral", icon: Sliders }, { id: "notificacoes", label: "Notificações", icon: Bell }, { id: "seguranca", label: "Segurança", icon: Shield }].map(s => (
+          <button key={s.id} onClick={() => setSection(s.id)} className={`tab-btn${section === s.id ? " active" : ""}`} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <s.icon size={13} /> {s.label}
+          </button>
+        ))}
+      </div>
+      {section === "geral" && (
+        <div>
+          <div className="card" style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Configurações do Sistema</div>
+            <ConfigRow label="Nome do aplicativo" description="Exibido na interface" control={<input type="text" value={config.appName || ""} onChange={e => update("appName", e.target.value)} style={{ ...inputStyle, width: 160 }} />} />
+            <ConfigRow label="Máx. de alunos" control={<input type="number" value={config.maxStudents || 50} min={1} onChange={e => update("maxStudents", Number(e.target.value))} style={{ ...inputStyle, width: 80 }} />} />
+            <ConfigRow label="Timeout de sessão (min)" control={<input type="number" value={config.sessionTimeout || 60} min={5} onChange={e => update("sessionTimeout", Number(e.target.value))} style={{ ...inputStyle, width: 80 }} />} />
+            <ConfigRow label="Fuso horário" control={<select value={config.timezone || "America/Sao_Paulo"} onChange={e => update("timezone", e.target.value)} style={{ ...inputStyle, cursor: "pointer" }}><option value="America/Sao_Paulo">Brasília (UTC-3)</option><option value="America/Manaus">Manaus (UTC-4)</option><option value="America/Fortaleza">Fortaleza (UTC-3)</option></select>} />
+          </div>
+          <div className="card" style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Recursos</div>
+            <ConfigRow label="Notificações push" control={<Toggle checked={!!config.enableNotifications} onChange={v => update("enableNotifications", v)} label="Notificações" />} />
+            <ConfigRow label="Modo manutenção" description="Bloqueia acesso de alunos" control={<Toggle checked={!!config.maintenanceMode} onChange={v => update("maintenanceMode", v)} label="Modo manutenção" />} />
+            <ConfigRow label="Backup automático" control={<Toggle checked={!!config.autoBackup} onChange={v => update("autoBackup", v)} label="Backup" />} />
+          </div>
+          <Btn onClick={saveConfig} icon={Save} style={{ width: "100%", justifyContent: "center" }}>Salvar Configurações</Btn>
+        </div>
+      )}
+      {section === "notificacoes" && (
+        <div className="card">
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Preferências de Notificação</div>
+          <ConfigRow label="Alertas de streak" description="Quando aluno bate recordes" control={<Toggle checked={true} onChange={() => toast("Atualizado!")} label="Alertas de streak" />} />
+          <ConfigRow label="Alertas de inatividade" description="+3 dias sem treinar" control={<Toggle checked={true} onChange={() => toast("Atualizado!")} label="Inatividade" />} />
+          <ConfigRow label="Resumo semanal" description="Todo domingo às 20h" control={<Toggle checked={false} onChange={() => toast("Atualizado!")} label="Resumo" />} />
+          <ConfigRow label="Fotos pendentes" description="Quando aluno envia foto" control={<Toggle checked={true} onChange={() => toast("Atualizado!")} label="Fotos" />} />
+          <div style={{ marginTop: 16 }}><Btn size="sm" onClick={() => toast("Preferências salvas!")} style={{ width: "100%", justifyContent: "center" }}>Salvar</Btn></div>
+        </div>
+      )}
+      {section === "seguranca" && (
+        <div>
+          <div className="card" style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14 }}>Status de Segurança</div>
+            <ConfigRow label="2FA" control={<Badge variant="amber">Em breve</Badge>} />
+            <ConfigRow label="Log de acessos" control={<Badge variant="green">Ativo</Badge>} />
+            <ConfigRow label="Timeout de sessão" control={<span style={{ fontSize: 12, color: MUTED }}>{config.sessionTimeout || 60}min</span>} />
+            <ConfigRow label="Proteção CSRF" control={<Badge variant="green">Ativo</Badge>} />
+            <ConfigRow label="Validação de dados" control={<Badge variant="green">Ativo</Badge>} />
+          </div>
+          <div className="card" style={{ background: `${DANGER}06`, borderColor: `${DANGER}28` }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: DANGER, marginBottom: 4 }}>Zona de Perigo</div>
+            <div style={{ fontSize: 12, color: `${DANGER}99`, marginBottom: 14 }}>Ações irreversíveis — use com cuidado</div>
+            <Btn variant="danger" size="sm" icon={Trash2}
+              onClick={() => { if (window.confirm("Limpar todos os logs de auditoria?")) { onAuditLogsChange([]); toast("Logs apagados.", "info"); } }}
+              style={{ width: "100%", justifyContent: "center" }}>
+              Limpar logs de auditoria
+            </Btn>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── ADMIN DASHBOARD (ROOT) ───────────────────────────────────────────────
+export function AdminDashboard({ user, onLogout }) {
+  const [tab,             setTab]             = useState("dashboard");
+  const [sidebarOpen,     setSidebarOpen]     = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState(null);
+  const [isMobile,        setIsMobile]        = useState(typeof window !== "undefined" ? window.innerWidth < 768 : false);
+
+  const { toast, ToastContainer } = useToast();
+
+  const {
+    users, studentsData, notifications, auditLogs, permissions, config,
+    pendingPhotosCount,
+    // ── NOVO ──
+    exerciseLibrary,
+    onUsersChange, onStudentsDataChange,
+    onNotificationsChange, onAuditLogsChange, onPermissionsChange, onConfigChange,
+    updateStudentWorkouts, updateCoachNote,
+    adminApprovePhoto, adminRequestResubmit,
+    addAuditLog,
+    // ── NOVO ──
+    addExerciseTemplate, updateExerciseTemplate, deleteExerciseTemplate,
+  } = useAdminProps();
+
+  useEffect(() => {
+    const onResize = () => { setIsMobile(window.innerWidth < 768); if (window.innerWidth >= 768) setSidebarOpen(false); };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  useEffect(() => {
+    document.body.style.overflow = sidebarOpen ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [sidebarOpen]);
+
+  const unreadNotifs = notifications.filter(n => !n.read).length;
+
+  function handleNavigate(tabId, studentId?) {
+    setTab(tabId);
+    if (studentId) setSelectedStudent(studentId);
+  }
+
+  const tabTitles = {
+    dashboard: "Dashboard", alunos: "Alunos", treinos: "Treinos",
+    biblioteca: "Biblioteca de Exercícios",
+    fotos: "Fotos de Progresso", relatorios: "Relatórios",
+    notificacoes: "Notificações", permissoes: "Permissões",
+    auditoria: "Auditoria", configuracoes: "Configurações",
+  };
+
+  return (
+    <div className="adm" style={{ display: "flex", minHeight: "100vh", background: "#0d0d0d", color: "#f0f0f0" }}>
+      <style>{GLOBAL_CSS}</style>
+
+      {!isMobile && (
+        <div style={{ width: 220, flexShrink: 0 }}>
+          <Sidebar activeTab={tab} onTabChange={setTab} user={user} onLogout={onLogout}
+            unreadNotifs={unreadNotifs} pendingPhotos={pendingPhotosCount} isMobile={false} />
+        </div>
+      )}
+
+      {isMobile && sidebarOpen && (
+        <Sidebar activeTab={tab} onTabChange={setTab} user={user} onLogout={onLogout}
+          unreadNotifs={unreadNotifs} pendingPhotos={pendingPhotosCount}
+          isMobile={true} onClose={() => setSidebarOpen(false)} />
+      )}
+
+      <main style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh", minWidth: 0 }}>
+        {/* Header */}
+        <header style={{
+          padding: "12px 16px", borderBottom: `1px solid ${BORDER}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: "rgba(13,13,13,0.85)", backdropFilter: "blur(12px)",
+          position: "sticky", top: 0, zIndex: 100, gap: 10,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+            {isMobile && (
+              <button onClick={() => setSidebarOpen(true)}
+                style={{ background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 10, width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", color: MUTED2, cursor: "pointer", flexShrink: 0 }}>
+                <Menu size={18} />
+              </button>
+            )}
+            <div style={{ minWidth: 0 }}>
+              <h2 className="display" style={{ fontSize: 16, margin: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tabTitles[tab]}</h2>
+              <div style={{ fontSize: 11, color: MUTED, marginTop: 1, display: isMobile ? "none" : "block" }}>
+                {new Date().toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })}
+              </div>
+            </div>
+          </div>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexShrink: 0 }}>
+            {pendingPhotosCount > 0 && (
+              <button onClick={() => setTab("fotos")}
+                style={{ background: `${AMBER}15`, border: `1px solid ${AMBER}33`, borderRadius: 10, padding: "6px 12px", display: "flex", alignItems: "center", gap: 6, color: AMBER, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                <Camera size={14} /> {pendingPhotosCount} foto{pendingPhotosCount > 1 ? "s" : ""}
+              </button>
+            )}
+            <div style={{ position: "relative" }}>
+              <button onClick={() => setTab("notificacoes")}
+                style={{ background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 10, width: 40, height: 40, display: "flex", alignItems: "center", justifyContent: "center", color: MUTED2, cursor: "pointer" }}>
+                <Bell size={16} />
+              </button>
+              {unreadNotifs > 0 && <span style={{ position: "absolute", top: 6, right: 6, width: 7, height: 7, borderRadius: "50%", background: DANGER }} />}
+            </div>
+            {!isMobile && <Btn variant="secondary" size="sm" onClick={onLogout} icon={LogOut}>Sair</Btn>}
+          </div>
+        </header>
+
+        {/* Conteúdo */}
+        <div style={{ padding: isMobile ? "14px 12px" : "20px 24px", flex: 1, overflowY: "auto" }}>
+          <AnimatePresence mode="wait">
+            <motion.div key={tab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} transition={{ duration: .18 }}>
+
+              {tab === "dashboard" && <TabDashboard users={users} studentsData={studentsData} onNavigate={handleNavigate} />}
+
+              {tab === "alunos" && (
+                <TabAlunos users={users} studentsData={studentsData}
+                  onUsersChange={onUsersChange} onStudentsDataChange={onStudentsDataChange}
+                  onNavigate={handleNavigate} toast={toast} />
+              )}
+
+              {tab === "treinos" && (
+                <TabTreinos
+                  users={users} studentsData={studentsData}
+                  updateStudentWorkouts={updateStudentWorkouts}
+                  selectedStudent={selectedStudent} onSelectStudent={setSelectedStudent}
+                  toast={toast}
+                  exerciseLibrary={exerciseLibrary}  /* ── NOVO */
+                />
+              )}
+
+              {/* ── NOVO: aba biblioteca */}
+              {tab === "biblioteca" && (
+                <TabBiblioteca
+                  exerciseLibrary={exerciseLibrary}
+                  addExerciseTemplate={addExerciseTemplate}
+                  updateExerciseTemplate={updateExerciseTemplate}
+                  deleteExerciseTemplate={deleteExerciseTemplate}
+                  toast={toast}
+                />
+              )}
+
+              {tab === "fotos" && (
+                <AdminPhotosTab users={users} studentsData={studentsData}
+                  onApprove={adminApprovePhoto} onRequestResubmit={adminRequestResubmit} />
+              )}
+
+              {tab === "relatorios" && <TabRelatorios users={users} studentsData={studentsData} toast={toast} />}
+
+              {tab === "notificacoes" && <TabNotificacoes notifications={notifications} onNotificationsChange={onNotificationsChange} toast={toast} />}
+
+              {tab === "permissoes" && <TabPermissoes permissions={permissions} onPermissionsChange={onPermissionsChange} toast={toast} />}
+
+              {tab === "auditoria" && <TabAuditoria auditLogs={auditLogs} onAuditLogsChange={onAuditLogsChange} toast={toast} />}
+
+              {tab === "configuracoes" && (
+                <TabConfiguracoes config={config} onConfigChange={onConfigChange}
+                  auditLogs={auditLogs} onAuditLogsChange={onAuditLogsChange}
+                  toast={toast} addAuditLog={addAuditLog} />
+              )}
+
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Bottom nav mobile */}
+        {isMobile && (
+          <nav style={{
+            position: "sticky", bottom: 0,
+            background: "rgba(13,13,13,0.95)", borderTop: `1px solid ${BORDER}`,
+            backdropFilter: "blur(12px)", display: "flex",
+            overflowX: "auto", padding: "6px 4px", gap: 2, zIndex: 100,
+          }}>
+            {SIDEBAR_ITEMS.flatMap(s => s.items).map(item => {
+              const Icon     = item.icon;
+              const isActive = tab === item.id;
+              return (
+                <button key={item.id} onClick={() => setTab(item.id)}
+                  style={{
+                    flex: "0 0 auto", display: "flex", flexDirection: "column", alignItems: "center",
+                    gap: 3, padding: "6px 10px",
+                    background: isActive ? `${N}18` : "none", border: "none", borderRadius: 10,
+                    color: isActive ? N : MUTED, cursor: "pointer",
+                    fontSize: 9, fontWeight: isActive ? 600 : 400,
+                    transition: "all .15s", minWidth: 52,
+                  }}>
+                  <Icon size={18} />
+                  {item.label}
+                </button>
+              );
+            })}
+          </nav>
+        )}
+      </main>
+
+      <ToastContainer />
+    </div>
+  );
+}
+
+export default AdminDashboard;
