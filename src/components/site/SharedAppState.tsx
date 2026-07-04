@@ -7,12 +7,11 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 
 // ─── Firebase ─────────────────────────────────────────────────────────────
-import { db, storage } from "@/components/site/firebase";
+import { db } from "@/components/site/firebase";
 import {
   collection, doc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot,
   writeBatch, query, orderBy, limit,
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 // ─── TIPOS ────────────────────────────────────────────────────────────────
 
@@ -187,8 +186,6 @@ const SEED_STUDENTS_DATA: Record<number, StudentData> = {
     coachNote: "Excelente semana, Rafael. Aumentamos a carga no agachamento em 5kg e adicionamos um dia de mobilidade. Mantém a constância — você está no caminho exato.",
     goals: [
       { id: "g1", type: "5 treinos completos", progress: 100, target: 100, deadline: "2026-06-06" },
-      { id: "g2", type: "Hidratação 3L/dia",   progress: 86,  target: 100, deadline: "2026-06-06" },
-      { id: "g3", type: "Sono 7h+",            progress: 71,  target: 100, deadline: "2026-06-06" },
     ],
     messages: [
       { from: "coach",   text: "Oi Rafael! Semana excelente. Próxima semana vamos aumentar volume no superior.", time: "10:32" },
@@ -213,10 +210,6 @@ const SEED_STUDENTS_DATA: Record<number, StudentData> = {
     bodyMeasurements: [
       { date: "2026-05-01", weight: 88,   chest: 110, waist: 92, arm: 33, thigh: 62, calf: 38 },
       { date: "2026-05-29", weight: 82.9, chest: 108, waist: 88, arm: 34, thigh: 60, calf: 37 },
-    ],
-    achievements: [
-      { id: "first_workout", name: "Primeiro Passo",     description: "Complete seu primeiro treino", icon: "🏃", unlocked: true },
-      { id: "week_streak",   name: "Semana Consistente", description: "Treinar 7 dias seguidos",      icon: "🔥", unlocked: true },
     ],
     progressPhotos: [
       { id: "ph1", url: null, date: "2026-05-01", label: "Início do protocolo · Semana 1", angle: "Frontal",
@@ -411,17 +404,31 @@ export function useAppContext() {
 
 // ─── HELPER: upload base64 para Storage ──────────────────────────────────
 
+const CLOUDINARY_CLOUD_NAME = "pimepdfk";
+const CLOUDINARY_UPLOAD_PRESET = "progress_photos_unsigned";
+
 async function uploadPhotoToStorage(studentId: number, url: string): Promise<string> {
   try {
     const response = await fetch(url);
     const blob = await response.blob();
-    const ext  = blob.type.includes("png") ? "png" : "jpg";
-    const storageRef = ref(storage, `progressPhotos/${studentId}/${Date.now()}.${ext}`);
-    const snapshot   = await uploadBytes(storageRef, blob);
-    return await getDownloadURL(snapshot.ref);
+
+    const formData = new FormData();
+    formData.append("file", blob);
+    formData.append("upload_preset", CLOUDINARY_UPLOAD_PRESET);
+    formData.append("folder", `progress-photos/${studentId}`);
+
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`,
+      { method: "POST", body: formData }
+    );
+
+    if (!res.ok) throw new Error("Falha no upload Cloudinary");
+
+    const data = await res.json();
+    return data.secure_url;
   } catch (e) {
     console.error("Erro no upload da foto:", e);
-    return url;
+    return url; // mesmo fallback de antes
   }
 }
 
