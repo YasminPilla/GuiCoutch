@@ -7,6 +7,8 @@
  * Upgrade: Peso / Séries / Reps no registro de treino agora usam dropdown
  *          editável (sugere valores por equipamento, mas aceita digitar).
  *          Séries limitado a 5, Reps limitado a 20.
+ * Upgrade NOVO: exibe o equipamento definido pelo coach para o exercício
+ *          (aba Treino, treino adaptado e modal de execução do treino).
  */
 
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
@@ -76,7 +78,7 @@ const LANGUAGE_OPTIONS = [
   { label: "Español",        value: "es-ES", flag: "🇪🇸" },
 ];
 
-// ─── NOVO: esquemas de carga por equipamento + limites de séries/reps ─────
+// ─── esquemas de carga por equipamento + limites de séries/reps ───────────
 // Mesma lógica de equipmentWeightSchemes.ts, embutida aqui para este arquivo
 // funcionar sozinho. Se você já tiver aquele arquivo no projeto, pode trocar
 // este bloco por um import e apagar a duplicação — ver nota no fim.
@@ -129,8 +131,13 @@ function resolveEquipment(exerciseName, library = []) {
   return found?.equipment || null;
 }
 
-function getWeightOptionsFor(exerciseName, library = []) {
-  const equipment = resolveEquipment(exerciseName, library);
+// ── ALTERADO: agora aceita um `explicitEquipment` (o que o coach definiu
+// diretamente no exercício do treino). Ordem de prioridade:
+// 1) equipamento definido manualmente pelo coach no exercício do treino
+// 2) equipamento cadastrado na biblioteca (busca por nome do exercício)
+// 3) lista genérica de pesos
+function getWeightOptionsFor(exerciseName, library = [], explicitEquipment = null) {
+  const equipment = explicitEquipment || resolveEquipment(exerciseName, library);
   if (equipment && WEIGHT_SCHEMES[equipment]) return WEIGHT_SCHEMES[equipment]();
   return GENERIC_WEIGHT_OPTIONS;
 }
@@ -346,7 +353,7 @@ function Dropdown({ options, value, onChange, isDark, accent }: any) {
   );
 }
 
-// ─── NOVO: EditableDropdown — combobox que sugere valores mas aceita digitar ──
+// ─── EditableDropdown — combobox que sugere valores mas aceita digitar ────
 // Usado para Peso / Séries / Reps no registro de treino.
 function EditableDropdown({ value, onChange, options, isDark, accent, placeholder }: any) {
   const [open, setOpen] = useState(false);
@@ -492,8 +499,6 @@ function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent }: any) {
                     <div className="display" style={{ fontSize: "1.21em", fontWeight: 800 }}>{w.name}</div>
                     <div style={{ fontSize: "0.86em", color: "var(--muted)", marginTop: 2, display: "flex", gap: 12 }}>
                       <span>{(w.exercises || []).length} exercícios</span>
-                      <span>·</span>
-                      <span>{w.totalEstimatedTime || 0} min</span>
                     </div>
                   </div>
                 </div>
@@ -511,12 +516,24 @@ function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent }: any) {
                         <span style={{ textAlign: "center" }}>Carga</span>
                         <span style={{ textAlign: "center" }}>Séries</span>
                         <span style={{ textAlign: "center" }}>Reps</span>
-                        <span style={{ textAlign: "center" }}>Tempo</span>
                       </div>
                       {(w.exercises || []).map((ex: any, idx: number) => (
                         <div key={ex.id} style={{ display: "grid", gridTemplateColumns: "1fr 80px 70px 70px 70px", gap: 8, alignItems: "center", padding: "10px 16px", borderRadius: 12, background: idx % 2 === 0 ? "rgba(255,255,255,0.02)" : "transparent", marginBottom: 4 }}>
                           <div>
                             <div style={{ fontSize: "1em", fontWeight: 600 }}>{ex.name}</div>
+                            {/* NOVO: equipamento definido pelo coach para este exercício */}
+                            {/* NOVO: equipamento definido pelo coach para este exercício */}
+                            {ex.equipment && (
+                              <div style={{ fontSize: "0.79em", color: BLUE, marginTop: 2, display: "flex", alignItems: "center", gap: 4 }}>
+                                <Dumbbell size={11} /> {ex.equipment}
+                              </div>
+                            )}
+                            {ex.videoUrl && (
+                              <a href={ex.videoUrl} target="_blank" rel="noopener noreferrer"
+                                style={{ fontSize: "0.79em", color: BLUE, marginTop: 2, display: "flex", alignItems: "center", gap: 4, textDecoration: "underline", width: "fit-content" }}>
+                                <Play size={11} /> Ver vídeo
+                              </a>
+                            )}
                             {ex.note && <div style={{ fontSize: "0.79em", color, marginTop: 2 }}>💡 {ex.note}</div>}
                           </div>
                           <div style={{ textAlign: "center" }}><span style={{ fontSize: "0.93em", fontWeight: 700, color }}>{ex.plannedLoad}</span></div>
@@ -1248,7 +1265,6 @@ function SettingsTab({ settings, onSettingsChange, isDark, accent, onResetSettin
         <div className="settings-item" style={{ flexDirection: "column", alignItems: "flex-start", gap: 12 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 12, width: "100%" }}>
             <div style={{ width: 38, height: 38, borderRadius: 10, background: `${color}18`, display: "flex", alignItems: "center", justifyContent: "center" }}><SlidersHorizontal size={18} style={{ color }} /></div>
-            <div style={{ flex: 1 }}><div style={{ fontWeight: 600 }}>Descanso Padrão</div><div style={{ fontSize: "0.86em", color: "var(--muted)" }}>Tempo entre séries</div></div>
             <span style={{ fontSize: "1.29em", fontWeight: 800, color, minWidth: 50, textAlign: "right" }}>{settings.defaultRestTime}s</span>
           </div>
           <div style={{ paddingLeft: 50, width: "100%" }}>
@@ -1387,7 +1403,10 @@ function AdaptiveWorkoutModal({ workout, onClose, onStart, accent }: any) {
               <div style={{ width: 24, height: 24, borderRadius: "50%", background: `${color}15`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.71em", fontWeight: 700, color }}>{i + 1}</div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: "0.93em", fontWeight: 500 }}>{ex.name}</div>
-                <div style={{ fontSize: "0.79em", color: "var(--muted)" }}>{ex.plannedSets}x · {ex.plannedLoad}</div>
+                {/* NOVO: mostra também o equipamento definido pelo coach, quando houver */}
+                <div style={{ fontSize: "0.79em", color: "var(--muted)" }}>
+                  {ex.plannedSets}x · {ex.plannedLoad}{ex.equipment ? ` · ${ex.equipment}` : ""}
+                </div>
               </div>
               <div style={{ fontSize: "0.79em", color: "var(--muted)" }}>~{ex.estimatedTime || 10}m</div>
             </div>
@@ -1431,11 +1450,20 @@ function WorkoutCarouselModal({
   const skippedCount   = skippedStatus.filter(Boolean).length;
   const allEvaluated   = completedCount + skippedCount === total;
 
-  // ── NOVO: opções de carga sugeridas para o exercício atual, pelo equipamento
-  // cadastrado na biblioteca (busca por nome). Se não achar, usa lista genérica.
+  // ── NOVO: exercício planejado atual — usado para saber o equipamento
+  // que o coach definiu para este exercício específico do treino.
+  const currentPlannedEx = useMemo(
+    () => (workout.exercises || []).find((e: any) => e.id === log?.exerciseId),
+    [workout.exercises, log?.exerciseId]
+  );
+
+  // ── opções de carga sugeridas para o exercício atual. Prioriza o
+  // equipamento definido manualmente pelo coach no exercício do treino;
+  // se não houver, cai para o equipamento cadastrado na biblioteca
+  // (busca por nome); por fim, usa a lista genérica.
   const weightOptions = useMemo(
-    () => getWeightOptionsFor(log?.exerciseName, exerciseLibrary),
-    [log?.exerciseName, exerciseLibrary]
+    () => getWeightOptionsFor(log?.exerciseName, exerciseLibrary, currentPlannedEx?.equipment),
+    [log?.exerciseName, exerciseLibrary, currentPlannedEx?.equipment]
   );
 
   function go(nextIdx: number) {
@@ -1642,7 +1670,7 @@ function WorkoutCarouselModal({
                           {l.exerciseName}
                         </div>
                         <div style={{ fontSize: "0.75em", color: "var(--muted)" }}>
-                          {(() => { const ex = (workout.exercises || []).find((e: any) => e.id === l.exerciseId); return ex ? `${ex.plannedSets}×${ex.plannedReps} @ ${ex.plannedLoad}` : ""; })()}
+                          {(() => { const ex = (workout.exercises || []).find((e: any) => e.id === l.exerciseId); return ex ? `${ex.plannedSets}×${ex.plannedReps} @ ${ex.plannedLoad}${ex.equipment ? ` · ${ex.equipment}` : ""}` : ""; })()}
                         </div>
                       </div>
                       {active && <ChevronRight size={14} style={{ color, flexShrink: 0 }} />}
@@ -1670,6 +1698,20 @@ function WorkoutCarouselModal({
                         color: isDone ? color : isSkipped ? DANGER : "inherit" }}>
                         {log?.exerciseName}
                       </div>
+                      {/* ── NOVO: equipamento definido pelo coach para este exercício ── */}
+                       {/* ── NOVO: equipamento definido pelo coach para este exercício ── */}
+                      {currentPlannedEx?.equipment && (
+                        <div style={{ fontSize: "0.86em", color: BLUE, marginTop: 4, display: "flex", alignItems: "center", gap: 6, fontWeight: 600 }}>
+                          <Dumbbell size={13} /> Equipamento: {currentPlannedEx.equipment}
+                        </div>
+                      )}
+                      {/* ── NOVO: link do vídeo demonstrativo do exercício ── */}
+                      {currentPlannedEx?.videoUrl && (
+                        <a href={currentPlannedEx.videoUrl} target="_blank" rel="noopener noreferrer"
+                          style={{ fontSize: "0.86em", color: BLUE, marginTop: 4, display: "flex", alignItems: "center", gap: 6, fontWeight: 600, textDecoration: "underline", width: "fit-content" }}>
+                          <Play size={13} /> Ver vídeo demonstrativo
+                        </a>
+                      )}
                       {isDone && (
                         <div style={{ fontSize: "0.86em", color, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
                           <CheckCircle2 size={13} /> Concluído
@@ -1686,12 +1728,12 @@ function WorkoutCarouselModal({
                     <div style={{ textAlign: "right", fontSize: "0.79em", color: "var(--muted)", background: "rgba(255,255,255,0.05)", padding: "6px 10px", borderRadius: 10 }}>
                       <div>Planejado</div>
                       <div style={{ fontWeight: 700, color: isDark ? "#f5f5f5" : "#1a1a1a", marginTop: 2 }}>
-                        {(() => { const ex = (workout.exercises || []).find((e: any) => e.id === log?.exerciseId); return ex ? `${ex.plannedSets}x${ex.plannedReps} @ ${ex.plannedLoad}` : ""; })()}
+                        {currentPlannedEx ? `${currentPlannedEx.plannedSets}x${currentPlannedEx.plannedReps} @ ${currentPlannedEx.plannedLoad}` : ""}
                       </div>
                     </div>
                   </div>
 
-                  {/* ── NOVO: Peso / Séries / Reps como dropdown editável ── */}
+                  {/* ── Peso / Séries / Reps como dropdown editável ── */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
                     <div>
                       <label style={{ fontSize: "0.71em", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 6 }}>Peso</label>

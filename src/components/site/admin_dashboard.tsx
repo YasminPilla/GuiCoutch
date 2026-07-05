@@ -1,14 +1,5 @@
 /* eslint-disable prettier/prettier, @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
-/**
- * GC Fitness — AdminDashboard [VERSÃO COMPLETA v3 + BIBLIOTECA DE EXERCÍCIOS]
- *
- * Novidades nesta versão:
- *  - Nova aba "Biblioteca" na sidebar com CRUD completo de exercícios
- *  - ExerciseEditor com autocomplete que busca da coleção exerciseLibrary no Firestore
- *  - Ao selecionar sugestão do autocomplete, preenche séries/reps/carga/vídeo automaticamente
- *  - TabBiblioteca: listagem por grupo muscular, busca, filtros, criar/editar/excluir templates
- */
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -872,11 +863,10 @@ function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, o
 }
 
 // ─── EDITOR DE EXERCÍCIO (com autocomplete da biblioteca) ─────────────────
-// ── ALTERADO: recebe exerciseLibrary como prop e mostra sugestões ao digitar nome ──
 const BLANK_EXERCISE = () => ({
   id: `ex_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
   name: "", plannedSets: "3", plannedReps: "12", plannedLoad: "",
-  note: "", estimatedTime: 10, videoUrl: "",
+  note: "", videoUrl: "", equipment: "Barra",
 });
 
 function ExerciseEditor({ exercise, onSave, onCancel, accent = N, exerciseLibrary = [] }) {
@@ -912,7 +902,7 @@ function ExerciseEditor({ exercise, onSave, onCancel, accent = N, exerciseLibrar
   }, []);
 
   // Seleciona sugestão e preenche campos automaticamente
-  function selectSuggestion(template) {
+function selectSuggestion(template) {
     setForm(prev => ({
       ...prev,
       name:         template.name,
@@ -921,8 +911,9 @@ function ExerciseEditor({ exercise, onSave, onCancel, accent = N, exerciseLibrar
       plannedLoad:  template.defaultLoad  || prev.plannedLoad,
       note:         template.note         || prev.note,
       videoUrl:     template.videoUrl     || prev.videoUrl,
+      equipment:    template.equipment    || prev.equipment,
     }));
-    setShowDropdown(false);
+          setShowDropdown(false);
     setSuggestions([]);
   }
 
@@ -1066,8 +1057,8 @@ function ExerciseEditor({ exercise, onSave, onCancel, accent = N, exerciseLibrar
           </AnimatePresence>
         </div>
 
-        {/* ── Séries / Reps / Carga / Tempo */}
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
+        {/* ── Séries / Reps / Carga */}
+       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 10 }}>
           <div>
             <label style={labelStyle}>Séries</label>
             <input type="number" min="1" max="20" value={form.plannedSets} onChange={f("plannedSets")} style={inputStyle} />
@@ -1081,8 +1072,10 @@ function ExerciseEditor({ exercise, onSave, onCancel, accent = N, exerciseLibrar
             <input value={form.plannedLoad} onChange={f("plannedLoad")} placeholder="70kg / PC" style={inputStyle} />
           </div>
           <div>
-            <label style={labelStyle}>Tempo (min)</label>
-            <input type="number" min="1" max="60" value={form.estimatedTime} onChange={f("estimatedTime")} style={inputStyle} />
+            <label style={labelStyle}>Equipamento</label>
+            <select value={form.equipment || "Barra"} onChange={f("equipment")} style={{ ...inputStyle, cursor: "pointer" }}>
+              {EQUIPMENT_OPTIONS.map(eq => <option key={eq} value={eq}>{eq}</option>)}
+            </select>
           </div>
         </div>
 
@@ -1153,7 +1146,9 @@ function ExerciseCard({ exercise, index, onEdit, onDelete, accent = N }) {
             {exercise.plannedLoad && (
               <span style={{ fontSize: 11, color: MUTED2 }}>@ {exercise.plannedLoad}</span>
             )}
-            <span style={{ fontSize: 11, color: MUTED }}>~{exercise.estimatedTime}min</span>
+            {exercise.equipment && (
+              <span style={{ fontSize: 11, color: BLUE, fontWeight: 600 }}>🔧 {exercise.equipment}</span>
+            )}
           </div>
           {exercise.note && (
             <div style={{ fontSize: 11, color: MUTED, marginTop: 4, fontStyle: "italic" }}>
@@ -1266,8 +1261,7 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
     } else {
       exercises = [...activeWorkout.exercises, ex];
     }
-    const totalTime = exercises.reduce((s, e) => s + Number(e.estimatedTime || 0), 0);
-    updateStudentWorkouts(current.id, workouts.map(w => w.id === activeWorkoutId ? { ...w, exercises, totalEstimatedTime: totalTime } : w));
+    updateStudentWorkouts(current.id, workouts.map(w => w.id === activeWorkoutId ? { ...w, exercises } : w));
     setAddingExercise(false);
     setEditingExercise(null);
     toast(existsIdx >= 0 ? "Exercício atualizado!" : "Exercício adicionado!");
@@ -1276,8 +1270,7 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
   function handleDeleteExercise(exId) {
     if (!current || !activeWorkout || !window.confirm("Remover exercício?")) return;
     const exercises = activeWorkout.exercises.filter(e => e.id !== exId);
-    const totalTime = exercises.reduce((s, e) => s + Number(e.estimatedTime || 0), 0);
-    updateStudentWorkouts(current.id, workouts.map(w => w.id === activeWorkoutId ? { ...w, exercises, totalEstimatedTime: totalTime } : w));
+    updateStudentWorkouts(current.id, workouts.map(w => w.id === activeWorkoutId ? { ...w, exercises } : w));
     toast("Exercício removido.", "info");
   }
 
@@ -1379,7 +1372,7 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12, color: wcolor, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 2 }}>{w.day}</div>
                         <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{w.name}</div>
-                        <div style={{ fontSize: 11, color: MUTED, marginTop: 3 }}>{(w.exercises || []).length} exerc. · {w.totalEstimatedTime || 0} min</div>
+                        <div style={{ fontSize: 11, color: MUTED, marginTop: 3 }}>{(w.exercises || []).length} exerc.</div>
                       </div>
                       <div style={{ display: "flex", gap: 4, flexShrink: 0, marginLeft: 8 }} onClick={e => e.stopPropagation()}>
                         <button onClick={() => handleDuplicateWorkout(w)} title="Duplicar"
@@ -1427,7 +1420,7 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
                       <div>
                         <div style={{ fontSize: 11, color, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>{activeWorkout.day}</div>
                         <div className="display" style={{ fontSize: 16, marginBottom: 4 }}>{activeWorkout.name}</div>
-                        <div style={{ fontSize: 12, color: MUTED }}>{(activeWorkout.exercises || []).length} exercícios · {activeWorkout.totalEstimatedTime || 0} min estimados</div>
+                        <div style={{ fontSize: 12, color: MUTED }}>{(activeWorkout.exercises || []).length}</div>
                       </div>
                       <button onClick={() => setEditingWorkout({ name: activeWorkout.name, day: activeWorkout.day })}
                         style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "8px 12px", color: MUTED2, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
@@ -1502,10 +1495,6 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
                       <div>
                         <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", fontWeight: 700 }}>Exercícios</div>
                         <div style={{ fontSize: 18, fontWeight: 800, color }}>{(activeWorkout.exercises || []).length}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", fontWeight: 700 }}>Tempo Estimado</div>
-                        <div style={{ fontSize: 18, fontWeight: 800, color }}>{activeWorkout.totalEstimatedTime || 0} min</div>
                       </div>
                     </div>
                   )}

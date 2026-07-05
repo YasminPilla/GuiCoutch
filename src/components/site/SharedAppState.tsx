@@ -36,6 +36,7 @@ export interface Exercise {
   note: string;
   estimatedTime: number;
   videoUrl?: string;
+  equipment?: string;
 }
 
 export interface Workout {
