@@ -322,6 +322,60 @@ function useToast() {
   return { toast: push, ToastContainer };
 }
 
+function useConfirm() {
+  const [state, setState] = useState(null); // { message, title, danger, resolve }
+
+  const confirm = useCallback((message, opts = {}) => {
+    return new Promise(resolve => {
+      setState({
+        message,
+        title: opts.title || "Confirmar ação",
+        danger: opts.danger !== false,
+        resolve,
+      });
+    });
+  }, []);
+
+  function handle(result) {
+    state?.resolve(result);
+    setState(null);
+  }
+
+  const ConfirmDialog = () => (
+    <AnimatePresence>
+      {state && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.96 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 20, scale: 0.96 }}
+            style={{ background: "#141414", border: `1px solid ${BORDER2}`, borderRadius: 18, padding: 22, width: "100%", maxWidth: 380 }}>
+            <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
+              <div style={{
+                width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                background: state.danger ? `${DANGER}15` : `${N}15`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <AlertTriangle size={18} style={{ color: state.danger ? DANGER : N }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <div className="display" style={{ fontSize: 15, marginBottom: 4 }}>{state.title}</div>
+                <div style={{ fontSize: 13, color: MUTED2, lineHeight: 1.5 }}>{state.message}</div>
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <Btn variant="secondary" onClick={() => handle(false)} style={{ flex: 1, justifyContent: "center" }}>Cancelar</Btn>
+              <Btn variant={state.danger ? "danger" : "primary"} onClick={() => handle(true)} style={{ flex: 1, justifyContent: "center" }}>OK</Btn>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+
+  return { confirm, ConfirmDialog };
+}
+
 // ─── MODAL ────────────────────────────────────────────────────────────────
 function Modal({ open, onClose, title, children, width = 480 }) {
   useEffect(() => {
@@ -599,7 +653,7 @@ function TabDashboard({ users, studentsData, onNavigate }) {
 }
 
 // ─── TAB: ALUNOS ──────────────────────────────────────────────────────────
-function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, onNavigate, toast }) {
+function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, onNavigate, toast, confirm }) {
   const [search,    setSearch]    = useState("");
   const [selected,  setSelected]  = useState(null);
   const [newModal,  setNewModal]  = useState(false);
@@ -649,8 +703,9 @@ function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, o
     toast(`Aluno ${newForm.name} criado!`);
   }
 
-  function handleDelete(student) {
-    if (!window.confirm(`Remover ${student.name}? Esta ação não pode ser desfeita.`)) return;
+   async function handleDelete(student) {
+    const ok = await confirm(`Remover ${student.name}? Esta ação não pode ser desfeita.`, { title: "Remover aluno" });
+    if (!ok) return;
     onUsersChange(users.filter(u => u.id !== student.id));
     const newData = { ...studentsData };
     delete newData[student.id];
@@ -1203,7 +1258,7 @@ function ExerciseCard({ exercise, index, onEdit, onDelete, accent = N }) {
 
 // ─── TAB: TREINOS ─────────────────────────────────────────────────────────
 // ── ALTERADO: passa exerciseLibrary para ExerciseEditor ──
-function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStudent, onSelectStudent, toast, exerciseLibrary }) {
+function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStudent, onSelectStudent, toast, confirm, exerciseLibrary }) {
   const students = users.filter(u => u.role === "student");
   const current  = selectedStudent ? students.find(s => s.id === selectedStudent) : null;
   const sd       = current ? studentsData[current.id] : null;
@@ -1245,8 +1300,10 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
     toast("Treino atualizado!");
   }
 
-  function handleDeleteWorkout(wid) {
-    if (!current || !window.confirm("Remover este treino e todos os exercícios?")) return;
+  async function handleDeleteWorkout(wid) {
+    if (!current) return;
+    const ok = await confirm("Remover este treino e todos os exercícios?", { title: "Remover treino" });
+    if (!ok) return;
     updateStudentWorkouts(current.id, workouts.filter(w => w.id !== wid));
     if (activeWorkoutId === wid) setActiveWorkoutId(null);
     toast("Treino removido.", "info");
@@ -1267,8 +1324,10 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
     toast(existsIdx >= 0 ? "Exercício atualizado!" : "Exercício adicionado!");
   }
 
-  function handleDeleteExercise(exId) {
-    if (!current || !activeWorkout || !window.confirm("Remover exercício?")) return;
+   async function handleDeleteExercise(exId) {
+    if (!current || !activeWorkout) return;
+    const ok = await confirm("Remover exercício?", { title: "Remover exercício" });
+    if (!ok) return;
     const exercises = activeWorkout.exercises.filter(e => e.id !== exId);
     updateStudentWorkouts(current.id, workouts.map(w => w.id === activeWorkoutId ? { ...w, exercises } : w));
     toast("Exercício removido.", "info");
@@ -1649,7 +1708,7 @@ function TemplateForm({ initial, onSave, onCancel, existingNames = [] }: {
   );
 }
 
-function TabBiblioteca({ exerciseLibrary, addExerciseTemplate, updateExerciseTemplate, deleteExerciseTemplate, toast }) {
+function TabBiblioteca({ exerciseLibrary, addExerciseTemplate, updateExerciseTemplate, deleteExerciseTemplate, toast, confirm }) {
   const [search,          setSearch]          = useState("");
   const [filterMuscle,    setFilterMuscle]    = useState("all");
   const [filterEquipment, setFilterEquipment] = useState("all");
@@ -1693,7 +1752,8 @@ function TabBiblioteca({ exerciseLibrary, addExerciseTemplate, updateExerciseTem
   }
 
   async function handleDelete(template: ExerciseTemplate) {
-    if (!window.confirm(`Remover "${template.name}" da biblioteca? Os treinos existentes que referenciam este exercício não serão afetados.`)) return;
+    const ok = await confirm(`Remover "${template.name}" da biblioteca? Os treinos existentes que referenciam este exercício não serão afetados.`, { title: "Remover exercício da biblioteca" });
+    if (!ok) return;
     try {
       await deleteExerciseTemplate(template.id);
       toast(`"${template.name}" removido.`, "info");
@@ -2507,7 +2567,7 @@ function TabPermissoes({ permissions, onPermissionsChange, toast }) {
 }
 
 // ─── TAB: AUDITORIA ───────────────────────────────────────────────────────
-function TabAuditoria({ auditLogs, onAuditLogsChange, toast }) {
+function TabAuditoria({ auditLogs, onAuditLogsChange, toast, confirm }) {
   const logColors = { info: MUTED2, success: N, warning: AMBER, error: DANGER };
   const logIcons  = { info: Activity, success: CheckCircle2, warning: AlertTriangle, error: AlertCircle };
   function exportLog() {
@@ -2523,7 +2583,7 @@ function TabAuditoria({ auditLogs, onAuditLogsChange, toast }) {
         <div style={{ display: "flex", gap: 8 }}>
           <Btn variant="secondary" size="sm" icon={Download} onClick={exportLog}>Exportar</Btn>
           <Btn variant="danger" size="sm" icon={Trash2}
-            onClick={() => { if (window.confirm("Limpar todos os logs?")) { onAuditLogsChange([]); toast("Logs apagados.", "info"); } }}>
+            onClick={async () => { const ok = await confirm("Limpar todos os logs?", { title: "Limpar auditoria" }); if (ok) { onAuditLogsChange([]); toast("Logs apagados.", "info"); } }}>
             Limpar
           </Btn>
         </div>
@@ -2550,7 +2610,7 @@ function TabAuditoria({ auditLogs, onAuditLogsChange, toast }) {
 }
 
 // ─── TAB: CONFIGURAÇÕES ───────────────────────────────────────────────────
-function TabConfiguracoes({ config, onConfigChange, auditLogs, onAuditLogsChange, toast, addAuditLog }) {
+function TabConfiguracoes({ config, onConfigChange, auditLogs, onAuditLogsChange, toast, confirm, addAuditLog }) {
   const [section, setSection] = useState("geral");
   function update(key, val) { onConfigChange({ ...config, [key]: val }); }
   function saveConfig() { toast("Configurações salvas!"); addAuditLog("Configurações do sistema atualizadas", "Sistema"); }
@@ -2606,7 +2666,7 @@ function TabConfiguracoes({ config, onConfigChange, auditLogs, onAuditLogsChange
             <div style={{ fontSize: 13, fontWeight: 600, color: DANGER, marginBottom: 4 }}>Zona de Perigo</div>
             <div style={{ fontSize: 12, color: `${DANGER}99`, marginBottom: 14 }}>Ações irreversíveis — use com cuidado</div>
             <Btn variant="danger" size="sm" icon={Trash2}
-              onClick={() => { if (window.confirm("Limpar todos os logs de auditoria?")) { onAuditLogsChange([]); toast("Logs apagados.", "info"); } }}
+              onClick={async () => { const ok = await confirm("Limpar todos os logs de auditoria?", { title: "Limpar auditoria" }); if (ok) { onAuditLogsChange([]); toast("Logs apagados.", "info"); } }}
               style={{ width: "100%", justifyContent: "center" }}>
               Limpar logs de auditoria
             </Btn>
@@ -2625,6 +2685,7 @@ export function AdminDashboard({ user, onLogout }) {
   const [isMobile,        setIsMobile]        = useState(typeof window !== "undefined" ? window.innerWidth < 768 : false);
 
   const { toast, ToastContainer } = useToast();
+  const { confirm, ConfirmDialog } = useConfirm();
 
   const {
     users, studentsData, notifications, auditLogs, permissions, config,
@@ -2733,7 +2794,7 @@ export function AdminDashboard({ user, onLogout }) {
               {tab === "alunos" && (
                 <TabAlunos users={users} studentsData={studentsData}
                   onUsersChange={onUsersChange} onStudentsDataChange={onStudentsDataChange}
-                  onNavigate={handleNavigate} toast={toast} />
+                  onNavigate={handleNavigate} toast={toast} confirm={confirm} />
               )}
 
               {tab === "treinos" && (
@@ -2741,12 +2802,11 @@ export function AdminDashboard({ user, onLogout }) {
                   users={users} studentsData={studentsData}
                   updateStudentWorkouts={updateStudentWorkouts}
                   selectedStudent={selectedStudent} onSelectStudent={setSelectedStudent}
-                  toast={toast}
-                  exerciseLibrary={exerciseLibrary}  /* ── NOVO */
+                  toast={toast} confirm={confirm}
+                  exerciseLibrary={exerciseLibrary}
                 />
               )}
 
-              {/* ── NOVO: aba biblioteca */}
               {tab === "biblioteca" && (
                 <TabBiblioteca
                   exerciseLibrary={exerciseLibrary}
@@ -2754,6 +2814,7 @@ export function AdminDashboard({ user, onLogout }) {
                   updateExerciseTemplate={updateExerciseTemplate}
                   deleteExerciseTemplate={deleteExerciseTemplate}
                   toast={toast}
+                  confirm={confirm}
                 />
               )}
 
@@ -2762,25 +2823,24 @@ export function AdminDashboard({ user, onLogout }) {
                   onApprove={adminApprovePhoto} onRequestResubmit={adminRequestResubmit} />
               )}
 
-              {tab === "relatorios" && <TabRelatorios users={users} studentsData={studentsData} toast={toast} />}
+              {tab === "relatorios" && <TabRelatorios users={users} studentsData={studentsData} toast={toast}  />}
 
               {tab === "notificacoes" && <TabNotificacoes notifications={notifications} onNotificationsChange={onNotificationsChange} toast={toast} />}
 
               {tab === "permissoes" && <TabPermissoes permissions={permissions} onPermissionsChange={onPermissionsChange} toast={toast} />}
 
-              {tab === "auditoria" && <TabAuditoria auditLogs={auditLogs} onAuditLogsChange={onAuditLogsChange} toast={toast} />}
+              {tab === "auditoria" && <TabAuditoria auditLogs={auditLogs} onAuditLogsChange={onAuditLogsChange} toast={toast} confirm={confirm} />}
 
               {tab === "configuracoes" && (
                 <TabConfiguracoes config={config} onConfigChange={onConfigChange}
                   auditLogs={auditLogs} onAuditLogsChange={onAuditLogsChange}
-                  toast={toast} addAuditLog={addAuditLog} />
+                  toast={toast} confirm={confirm} addAuditLog={addAuditLog} />
               )}
 
             </motion.div>
           </AnimatePresence>
         </div>
 
-        {/* Bottom nav mobile */}
         {isMobile && (
           <nav style={{
             position: "sticky", bottom: 0,
@@ -2811,6 +2871,7 @@ export function AdminDashboard({ user, onLogout }) {
       </main>
 
       <ToastContainer />
+      <ConfirmDialog />
     </div>
   );
 }
