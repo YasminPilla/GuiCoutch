@@ -23,8 +23,6 @@ export function About() {
   return (
     <>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@600;800&family=Inter:wght@400;500&display=swap');
-
         /* ── Container principal ── */
         .ab {
           padding: 80px 24px;
@@ -55,6 +53,7 @@ export function About() {
 
         /* ── Foto do personal ── */
         .ab-photo {
+          width: 100%;
           aspect-ratio: 3/4;
           border-radius: 24px;
           background: linear-gradient(135deg, rgba(0,255,136,0.08) 0%, rgba(0,255,136,0.02) 100%);
@@ -425,7 +424,7 @@ export function About() {
             <div className="ab-quote-card">
               <p className="ab-quote-text">
                 Treino bom não é o mais pesado, nem o mais complexo. É o que você consegue executar bem, semana após semana.
-                <p className="ab-quote-text"></p></p>
+              </p>
 
               <div  className="ab-quote-author">
                 <img src="/logo.png" alt="GC" className="ab-quote-logo" />

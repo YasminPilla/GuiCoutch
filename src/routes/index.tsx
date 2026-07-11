@@ -51,17 +51,21 @@ function Index() {
   const handleBackToHome  = () => setShowLoginPage(false);
 
   return (
-    <SharedAppProvider>
-      {showLoginPage && (
-        <LoginPage onLogin={handleLogin} onBackToHome={handleBackToHome} />
-      )}
+    <>
+      {(showLoginPage || currentUser) && (
+        <SharedAppProvider>
+          {showLoginPage && (
+            <LoginPage onLogin={handleLogin} onBackToHome={handleBackToHome} />
+          )}
 
-      {!showLoginPage && currentUser?.role === "admin" && (
-        <AdminDashboard user={currentUser} onLogout={handleLogout} />
-      )}
+          {!showLoginPage && currentUser?.role === "admin" && (
+            <AdminDashboard user={currentUser} onLogout={handleLogout} />
+          )}
 
-      {!showLoginPage && currentUser?.role === "student" && (
-        <StudentDashboard user={currentUser} onLogout={handleLogout} />
+          {!showLoginPage && currentUser?.role === "student" && (
+            <StudentDashboard user={currentUser} onLogout={handleLogout} />
+          )}
+        </SharedAppProvider>
       )}
 
       {!showLoginPage && !currentUser && (
@@ -90,6 +94,6 @@ function Index() {
           <Footer />
         </main>
       )}
-    </SharedAppProvider>
+    </>
   );
 }
