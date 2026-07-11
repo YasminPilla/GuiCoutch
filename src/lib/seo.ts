@@ -1,3 +1,3 @@
-// TODO: atualizar para o domínio definitivo assim que ele for registrado/apontado.
-export const SITE_URL = "https://guilhermecouto.com";
+// TODO: atualizar para guilhermecouto.com assim que o DNS for apontado para o Vercel.
+export const SITE_URL = "https://gc-guicoach.vercel.app";
 export const SITE_NAME = "Guilherme Couto — Personal";

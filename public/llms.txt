@@ -1,0 +1,37 @@
+# Guilherme Couto — Personal Trainer
+
+> Acompanhamento profissional de personal trainer online, com planos mensais de treino personalizado e produtos digitais avulsos (planilhas de treino, guias de alimentação e suplementação).
+
+Guilherme Couto é personal trainer (CREF 098765-G/SP), bacharel em Educação Física pela UNESP, com certificação NSCA/CSCS. Atende alunos remotamente por todo o Brasil através de uma plataforma própria, com atendimento presencial adicional em Cotia/SP. Especialidades: emagrecimento acelerado, hipertrofia e ganho de massa, treinamento de força e correção postural.
+
+## Planos mensais (assinatura)
+
+- **Starter — R$ 39,90/mês**: acesso à plataforma, treino personalizado (casa ou academia), suporte com resposta em até 72h.
+- **Plus — R$ 89,90/mês** (mais escolhido): treino com periodização, suporte prioritário (24h), acompanhamento semanal, sugestão de alimentos e suplementos, registro de progresso.
+- **Premium — R$ 179,90/mês**: suporte VIP (12h), check-in quinzenal, relatório mensal de progresso, videochamada mensal de 30 min.
+
+Todos os planos incluem treino personalizado e acesso à plataforma, sem taxa de adesão. Atendimento presencial em Cotia/SP disponível como adicional pago nos planos Plus e Premium.
+
+## Produtos digitais (compra única, sem assinatura)
+
+- Planilha de Treino — Casa (treino funcional sem equipamentos): R$ 27–47
+- Planilha de Treino — Academia (hipertrofia ou emagrecimento): R$ 37–57
+- Guia de Suplementação: R$ 17–37
+- Guia de Alimentos Estratégicos: R$ 17–27
+- Desafio 21 Dias (treino diário + hábitos): R$ 47–67
+- Combos (Casa Completo, Academia Completo, Iniciante Total, Saúde & Resultado): R$ 57–87
+
+## Como funciona
+
+1. O aluno assina um plano ou compra um produto digital.
+2. Recebe o treino personalizado na plataforma (vídeos, séries, cargas e notas do coach).
+3. Registra treinos, fotos e medidas; Guilherme acompanha a evolução e ajusta o plano.
+
+## Páginas
+
+- [Site principal](https://gc-guicoach.vercel.app/): apresentação, planos, produtos, como funciona, resultados de alunos e contato.
+
+## Contato
+
+- E-mail: contato@guilhermecouto.com
+- WhatsApp: +55 11 95922-2489
