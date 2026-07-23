@@ -66,10 +66,10 @@ const ACCENT_COLORS = [
 ];
 
 const FONT_FAMILY_OPTIONS = [
-  { label: "Outfit (Padrão)", value: "'Outfit', sans-serif" },
+  { label: "System (Padrão)", value: "system-ui, sans-serif" },
   { label: "Inter",           value: "'Inter', sans-serif" },
   { label: "Roboto",          value: "'Roboto', sans-serif" },
-  { label: "System",          value: "system-ui, sans-serif" },
+  { label: "Outfit",          value: "'Outfit', sans-serif" },
 ];
 
 const LANGUAGE_OPTIONS = [
@@ -152,7 +152,7 @@ const DEFAULT_SETTINGS = {
   isDark: true,
   fontSize: 14,
   accentColor: "#00FF88",
-  fontFamily: "'Outfit', sans-serif",
+  fontFamily: "system-ui, sans-serif",
   compactMode: false,
   highContrast: false,
   reducedMotion: false,
@@ -201,26 +201,26 @@ function getThemeCss(isDark, fontSize, accentColor, fontFamily, compactMode, hig
   const spacing = compactMode ? 0.75 : 1;
 
   return `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap');
   * { box-sizing: border-box; }
   .student-area {
-    font-family: ${fontFamily || "'Outfit', sans-serif"};
+    font-family: ${fontFamily || "system-ui, sans-serif"};
     background: ${BG_COLOR}; color: ${TEXT_COLOR}; font-size: ${fontSize}px;
     transition: background 0.3s, color 0.3s, font-size 0.2s;
     --card-bg: ${CARD_BG}; --border: ${BORDER_COLOR}; --text: ${TEXT_COLOR};
     --bg: ${BG_COLOR}; --muted: ${MUTED_COLOR}; --accent: ${accent};
     --spacing: ${spacing}; --fs: ${fontSize}px;
   }
-  .student-area .display { font-family: 'Syne', sans-serif; }
+  .student-area .display { font-family: system-ui, sans-serif; }
   .student-area .neon    { color: ${accent}; }
   .student-area .muted   { color: ${MUTED_COLOR}; }
   .student-area input, .student-area textarea {
     background: ${CARD_BG}; border: 1px solid ${BORDER_COLOR}; color: ${TEXT_COLOR};
-    font-family: ${fontFamily || "'Outfit', sans-serif"}; border-radius: 12px;
+    font-family: ${fontFamily || "system-ui, sans-serif"}; border-radius: 12px;
     padding: 12px 16px; width: 100%; font-size: inherit; outline: none; transition: border .2s;
   }
   .student-area input:focus, .student-area textarea:focus { border-color: ${accent}44; }
-  .student-area button { cursor: pointer; font-family: ${fontFamily || "'Outfit', sans-serif"}; font-size: inherit; }
+  .student-area button { cursor: pointer; font-family: ${fontFamily || "system-ui, sans-serif"}; font-size: inherit; }
   .student-area .card {
     background: ${CARD_BG}; border: 1px solid ${BORDER_COLOR};
     border-radius: ${compactMode ? "14px" : "20px"}; padding: ${compactMode ? "14px" : "20px"};
@@ -803,7 +803,7 @@ function PhotoUploadModal({ isDark, onClose, onSubmit, accent }: any) {
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
             <div>
               <div style={{ fontSize: "0.79em", color, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>Passo {step} de 3</div>
-              <h3 style={{ fontFamily: "'Syne',sans-serif", fontSize: "1.43em", fontWeight: 800, margin: 0 }}>{stepLabels[step - 1]}</h3>
+              <h3 style={{ fontFamily: "system-ui,sans-serif", fontSize: "1.43em", fontWeight: 800, margin: 0 }}>{stepLabels[step - 1]}</h3>
             </div>
             <button onClick={onClose} style={{ background: "rgba(255,255,255,0.07)", border: "none", borderRadius: 10, padding: 8, color: isDark ? "#aaa" : "#666", cursor: "pointer" }}><X size={18} /></button>
           </div>
@@ -880,7 +880,7 @@ function PhotoUploadModal({ isDark, onClose, onSubmit, accent }: any) {
               <motion.div key="s3" initial={{ x: 60, opacity: 0 }} animate={{ x: 0, opacity: 1 }} exit={{ x: -60, opacity: 0 }} transition={{ duration: 0.22 }} style={{ padding: 20 }}>
                 <div style={{ textAlign: "center", marginBottom: 24 }}>
                   <div style={{ fontSize: "3.43em", marginBottom: 8 }}>📸</div>
-                  <div style={{ fontFamily: "'Syne',sans-serif", fontSize: "1.43em", fontWeight: 800, marginBottom: 4 }}>Tudo certo!</div>
+                  <div style={{ fontFamily: "system-ui,sans-serif", fontSize: "1.43em", fontWeight: 800, marginBottom: 4 }}>Tudo certo!</div>
                   <div style={{ fontSize: "0.93em", color: "var(--muted)" }}>Revise os detalhes antes de enviar ao coach</div>
                 </div>
                 {newPhoto.preview && (
@@ -1586,7 +1586,7 @@ function WorkoutCarouselModal({
               <div style={{ fontSize: "0.79em", color, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 4 }}>
                 {showFeedback ? "Feedback Final" : "Registrando Agora"}
               </div>
-              <h3 style={{ fontFamily: "'Syne',sans-serif", fontSize: "1.29em", fontWeight: 800, margin: 0 }}>{workout.name}</h3>
+              <h3 style={{ fontFamily: "system-ui,sans-serif", fontSize: "1.29em", fontWeight: 800, margin: 0 }}>{workout.name}</h3>
             </div>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
               {!showFeedback && (
@@ -1695,7 +1695,7 @@ function WorkoutCarouselModal({
 
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
                     <div>
-                      <div style={{ fontSize: "1.43em", fontWeight: 800, fontFamily: "'Syne',sans-serif",
+                      <div style={{ fontSize: "1.43em", fontWeight: 800, fontFamily: "system-ui,sans-serif",
                         color: isDone ? color : isSkipped ? DANGER : "inherit" }}>
                         {log?.exerciseName}
                       </div>
@@ -1850,7 +1850,7 @@ function WorkoutCarouselModal({
             <div style={{ padding: 20 }}>
               <div style={{ textAlign: "center", marginBottom: 24 }}>
                 <div style={{ fontSize: "3.43em", marginBottom: 8 }}>🎯</div>
-                <div style={{ fontFamily: "'Syne',sans-serif", fontSize: "1.57em", fontWeight: 800, marginBottom: 4 }}>Treino Finalizado!</div>
+                <div style={{ fontFamily: "system-ui,sans-serif", fontSize: "1.57em", fontWeight: 800, marginBottom: 4 }}>Treino Finalizado!</div>
                 <div style={{ fontSize: "0.93em", color: "var(--muted)" }}>{completedCount} de {total} exercícios concluídos</div>
               </div>
 
@@ -1948,7 +1948,7 @@ function WorkoutCarouselModal({
               display: "flex", flexDirection: "column" }}>
             <div style={{ padding: "16px 18px", display: "flex", justifyContent: "space-between", alignItems: "center",
               borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)"}`, flexShrink: 0 }}>
-              <h3 style={{ fontFamily: "'Syne',sans-serif", fontSize: "1.14em", fontWeight: 800, margin: 0 }}>
+              <h3 style={{ fontFamily: "system-ui,sans-serif", fontSize: "1.14em", fontWeight: 800, margin: 0 }}>
                 💡 {currentPlannedEx?.name || log?.exerciseName}
               </h3>
               <button onClick={() => setShowNoteModal(false)}
