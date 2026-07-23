@@ -119,8 +119,7 @@ const GENERIC_WEIGHT_OPTIONS = [
   60, 70, 80, 90, 100, 120, 140, 160, 180, 200,
 ].map(fmtKg);
 
-// limites pedidos: no máximo 5 séries e 20 reps por registro de treino
-const SERIES_OPTIONS = ["1", "2", "3", "4", "5"];
+// limite pedido: no máximo 20 reps por registro de treino
 const REPS_OPTIONS = Array.from({ length: 20 }, (_, i) => String(i + 1));
 
 function resolveEquipment(exerciseName, library = []) {
@@ -1737,29 +1736,19 @@ function WorkoutCarouselModal({
                     </div>
                   </div>
 
-                  {/* ── Peso / Séries / Reps como dropdown editável ── */}
+                  {/* ── Séries (fixo, definido pelo coach) / Reps / Peso como dropdown editável ── */}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
                     <div>
-                      <label style={{ fontSize: "0.71em", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 6 }}>Peso</label>
-                      <EditableDropdown
-                        value={log?.actualWeight ?? ""}
-                        onChange={v => updateLog("actualWeight", v)}
-                        options={weightOptions}
-                        isDark={isDark}
-                        accent={color}
-                        placeholder="Ex: 12kg"
-                      />
-                    </div>
-                    <div>
                       <label style={{ fontSize: "0.71em", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 6 }}>Séries</label>
-                      <EditableDropdown
-                        value={String(log?.actualSets ?? "")}
-                        onChange={v => updateLog("actualSets", v)}
-                        options={SERIES_OPTIONS}
-                        isDark={isDark}
-                        accent={color}
-                        placeholder="Ex: 3"
-                      />
+                      <div style={{
+                        width: "100%", boxSizing: "border-box",
+                        background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)",
+                        border: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)"}`,
+                        color: "var(--muted)", borderRadius: 12, padding: "10px 12px",
+                        fontSize: "0.93em", fontWeight: 700, textAlign: "center",
+                      }}>
+                        {log?.actualSets ?? ""}
+                      </div>
                     </div>
                     <div>
                       <label style={{ fontSize: "0.71em", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 6 }}>Reps</label>
@@ -1770,6 +1759,17 @@ function WorkoutCarouselModal({
                         isDark={isDark}
                         accent={color}
                         placeholder="Ex: 12"
+                      />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: "0.71em", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 6 }}>Peso</label>
+                      <EditableDropdown
+                        value={log?.actualWeight ?? ""}
+                        onChange={v => updateLog("actualWeight", v)}
+                        options={weightOptions}
+                        isDark={isDark}
+                        accent={color}
+                        placeholder="Ex: 12kg"
                       />
                     </div>
                   </div>
