@@ -142,6 +142,13 @@ function getWeightOptionsFor(exerciseName, library = [], explicitEquipment = nul
   return GENERIC_WEIGHT_OPTIONS;
 }
 
+// converte URL do YouTube (watch/youtu.be/shorts) para URL de embed; null se não for YouTube
+function getYouTubeEmbedUrl(url) {
+  if (!url) return null;
+  const match = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/);
+  return match?.[1] ? `https://www.youtube.com/embed/${match[1]}` : null;
+}
+
 const DEFAULT_SETTINGS = {
   isDark: true,
   fontSize: 14,
@@ -528,13 +535,6 @@ function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent }: any) {
                                 <Dumbbell size={11} /> {ex.equipment}
                               </div>
                             )}
-                            {ex.videoUrl && (
-                              <a href={ex.videoUrl} target="_blank" rel="noopener noreferrer"
-                                style={{ fontSize: "0.79em", color: BLUE, marginTop: 2, display: "flex", alignItems: "center", gap: 4, textDecoration: "underline", width: "fit-content" }}>
-                                <Play size={11} /> Ver vídeo
-                              </a>
-                            )}
-                            {ex.note && <div style={{ fontSize: "0.79em", color, marginTop: 2 }}>💡 {ex.note}</div>}
                           </div>
                           <div style={{ textAlign: "center" }}><span style={{ fontSize: "0.93em", fontWeight: 700, color }}>{ex.plannedLoad}</span></div>
                           <div style={{ textAlign: "center" }}><span style={{ display: "inline-block", background: `${color}18`, color, fontSize: "0.93em", fontWeight: 700, padding: "3px 10px", borderRadius: 8 }}>{ex.plannedSets}x</span></div>
@@ -1440,6 +1440,7 @@ function WorkoutCarouselModal({
   const [skippedStatus, setSkippedStatus] = useState<boolean[]>(() => workoutLogs.map(() => false));
   const [showFeedback,  setShowFeedback]  = useState(false);
   const [showExList,    setShowExList]    = useState(false);
+  const [showNoteModal, setShowNoteModal] = useState(false);
 
   const color          = accent || N;
   const total          = workoutLogs.length;
@@ -1563,6 +1564,7 @@ function WorkoutCarouselModal({
   };
 
   return (
+    <>
     <motion.div
       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.92)", zIndex: 100,
@@ -1705,12 +1707,14 @@ function WorkoutCarouselModal({
                           <Dumbbell size={13} /> Equipamento: {currentPlannedEx.equipment}
                         </div>
                       )}
-                      {/* ── NOVO: link do vídeo demonstrativo do exercício ── */}
-                      {currentPlannedEx?.videoUrl && (
-                        <a href={currentPlannedEx.videoUrl} target="_blank" rel="noopener noreferrer"
-                          style={{ fontSize: "0.86em", color: BLUE, marginTop: 4, display: "flex", alignItems: "center", gap: 6, fontWeight: 600, textDecoration: "underline", width: "fit-content" }}>
-                          <Play size={13} /> Ver vídeo demonstrativo
-                        </a>
+                      {/* ── Observação do exercício: abre modal com explicação + vídeo ── */}
+                      {(currentPlannedEx?.note || currentPlannedEx?.videoUrl) && (
+                        <button type="button" onClick={() => setShowNoteModal(true)}
+                          style={{ fontSize: "0.86em", color, marginTop: 4, display: "flex", alignItems: "center", gap: 6,
+                            fontWeight: 600, background: "none", border: "none", padding: 0, cursor: "pointer",
+                            textDecoration: "underline", width: "fit-content", fontFamily: "inherit" }}>
+                          💡 Observação
+                        </button>
                       )}
                       {isDone && (
                         <div style={{ fontSize: "0.86em", color, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
@@ -1924,6 +1928,62 @@ function WorkoutCarouselModal({
         </div>
       </motion.div>
     </motion.div>
+
+    {/* ── Modal de Observação: explicação do exercício + vídeo do YouTube ── */}
+    <AnimatePresence>
+      {showNoteModal && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          onClick={() => setShowNoteModal(false)}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 150,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16, backdropFilter: "blur(6px)" }}>
+          <motion.div
+            initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+            onClick={e => e.stopPropagation()}
+            style={{ width: "100%", maxWidth: 520,
+              background: isDark ? "#141414" : "#f8f9fa",
+              border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`,
+              borderRadius: 20, overflow: "hidden", maxHeight: "88vh",
+              display: "flex", flexDirection: "column" }}>
+            <div style={{ padding: "16px 18px", display: "flex", justifyContent: "space-between", alignItems: "center",
+              borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)"}`, flexShrink: 0 }}>
+              <h3 style={{ fontFamily: "'Syne',sans-serif", fontSize: "1.14em", fontWeight: 800, margin: 0 }}>
+                💡 {currentPlannedEx?.name || log?.exerciseName}
+              </h3>
+              <button onClick={() => setShowNoteModal(false)}
+                style={{ background: "rgba(255,255,255,0.07)", border: "none", borderRadius: 10, padding: 8, color: isDark ? "#aaa" : "#666", cursor: "pointer" }}>
+                <X size={18} />
+              </button>
+            </div>
+            <div style={{ padding: 18, overflowY: "auto", display: "flex", flexDirection: "column", gap: 16 }}>
+              {currentPlannedEx?.note && (
+                <p style={{ margin: 0, fontSize: "0.93em", lineHeight: 1.6 }}>{currentPlannedEx.note}</p>
+              )}
+              {currentPlannedEx?.videoUrl && (
+                getYouTubeEmbedUrl(currentPlannedEx.videoUrl) ? (
+                  <div style={{ position: "relative", paddingTop: "56.25%", borderRadius: 14, overflow: "hidden" }}>
+                    <iframe
+                      src={getYouTubeEmbedUrl(currentPlannedEx.videoUrl)}
+                      title="Vídeo demonstrativo do exercício"
+                      style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: "none" }}
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                    />
+                  </div>
+                ) : (
+                  <a href={currentPlannedEx.videoUrl} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize: "0.93em", color, display: "flex", alignItems: "center", gap: 6, fontWeight: 600, textDecoration: "underline", width: "fit-content" }}>
+                    <Play size={14} /> Ver vídeo demonstrativo
+                  </a>
+                )
+              )}
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+    </>
   );
 }
 
