@@ -1427,16 +1427,19 @@ function WorkoutCarouselModal({
   setWorkoutLogs,
   postWorkoutData,
   setPostWorkoutData,
+  currentIdx,
+  setCurrentIdx,
+  doneStatus,
+  setDoneStatus,
+  skippedStatus,
+  setSkippedStatus,
   isDark,
   onClose,
   onSave,
   accent,
   exerciseLibrary,
 }: any) {
-  const [currentIdx,    setCurrentIdx]    = useState(0);
   const [direction,     setDirection]     = useState(1);
-  const [doneStatus,    setDoneStatus]    = useState<boolean[]>(() => workoutLogs.map(() => false));
-  const [skippedStatus, setSkippedStatus] = useState<boolean[]>(() => workoutLogs.map(() => false));
   const [showFeedback,  setShowFeedback]  = useState(false);
   const [showExList,    setShowExList]    = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
@@ -1996,10 +1999,51 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
   const [selectedWorkout,   setSelectedWorkout]   = useState<any>(null);
   const [workoutLogs,       setWorkoutLogs]       = useState<any[]>([]);
   const [postWorkoutData,   setPostWorkoutData]   = useState({ energyLevel: 7, generalNotes: "" });
+  const [workoutCurrentIdx,    setWorkoutCurrentIdx]    = useState(0);
+  const [workoutDoneStatus,    setWorkoutDoneStatus]    = useState<boolean[]>([]);
+  const [workoutSkippedStatus, setWorkoutSkippedStatus] = useState<boolean[]>([]);
 
   // ── FIX RELATÓRIOS: cache local das sessões salvas nesta sessão ──────────
   // Evita depender do snapshot do Firestore para mostrar o treino imediatamente
   const [localSessions, setLocalSessions] = useState<WorkoutSession[]>([]);
+
+  // ── Cache do treino em andamento: se o aluno fechar o modal ou o navegador,
+  // o progresso (exercício atual, séries/reps/peso digitados, concluídos/pulados)
+  // é restaurado ao reabrir. Só é limpo quando o treino é salvo.
+  const activeWorkoutKey = `gym_active_workout_${user.id}`;
+  const restoredActiveWorkout = useRef(false);
+
+  useEffect(() => {
+    if (restoredActiveWorkout.current) return;
+    restoredActiveWorkout.current = true;
+    try {
+      const raw = localStorage.getItem(activeWorkoutKey);
+      if (!raw) return;
+      const cache = JSON.parse(raw);
+      if (!cache?.workout) return;
+      setSelectedWorkout(cache.workout);
+      setWorkoutLogs(cache.logs || []);
+      setPostWorkoutData(cache.post || { energyLevel: 7, generalNotes: "" });
+      setWorkoutCurrentIdx(cache.currentIdx || 0);
+      setWorkoutDoneStatus(cache.doneStatus || []);
+      setWorkoutSkippedStatus(cache.skippedStatus || []);
+      setShowWorkoutModal(true);
+    } catch {}
+  }, [activeWorkoutKey]);
+
+  useEffect(() => {
+    if (!showWorkoutModal || !selectedWorkout) return;
+    try {
+      localStorage.setItem(activeWorkoutKey, JSON.stringify({
+        workout: selectedWorkout,
+        logs: workoutLogs,
+        post: postWorkoutData,
+        currentIdx: workoutCurrentIdx,
+        doneStatus: workoutDoneStatus,
+        skippedStatus: workoutSkippedStatus,
+      }));
+    } catch {}
+  }, [activeWorkoutKey, showWorkoutModal, selectedWorkout, workoutLogs, postWorkoutData, workoutCurrentIdx, workoutDoneStatus, workoutSkippedStatus]);
 
   const {
     sharedStudentData,
@@ -2017,6 +2061,26 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
   const accent = settings.accentColor || N;
 
   function handleStartWorkout(w: any, exercises?: any[]) {
+    // Se já existe um treino em andamento (mesmo id) em cache — em memória ou
+    // no localStorage (ex: modal foi fechado com X mas não finalizado) —
+    // reabre exatamente de onde parou em vez de reiniciar do zero.
+    if (!exercises) {
+      try {
+        const raw = localStorage.getItem(activeWorkoutKey);
+        const cache = raw ? JSON.parse(raw) : null;
+        if (cache?.workout?.id === w.id) {
+          setSelectedWorkout(cache.workout);
+          setWorkoutLogs(cache.logs || []);
+          setPostWorkoutData(cache.post || { energyLevel: 7, generalNotes: "" });
+          setWorkoutCurrentIdx(cache.currentIdx || 0);
+          setWorkoutDoneStatus(cache.doneStatus || []);
+          setWorkoutSkippedStatus(cache.skippedStatus || []);
+          setShowWorkoutModal(true);
+          setShowAdaptiveModal(false);
+          return;
+        }
+      } catch {}
+    }
     setSelectedWorkout(w);
     const exToUse = exercises || w.exercises || [];
     setWorkoutLogs(exToUse.map((ex: any) => ({
@@ -2032,6 +2096,9 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
       notes:        "",
     })));
     setPostWorkoutData({ energyLevel: 7, generalNotes: "" });
+    setWorkoutCurrentIdx(0);
+    setWorkoutDoneStatus(exToUse.map(() => false));
+    setWorkoutSkippedStatus(exToUse.map(() => false));
     setShowWorkoutModal(true);
     setShowAdaptiveModal(false);
   }
@@ -2042,8 +2109,9 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
     setLocalSessions(prev => [session, ...prev]);
     // 2. Persiste no Firestore via SharedAppState
     onAddWorkoutSession(session);
-    // 3. Fecha o modal
+    // 3. Fecha o modal e limpa o cache do treino em andamento
     setShowWorkoutModal(false);
+    try { localStorage.removeItem(activeWorkoutKey); } catch {}
   }
 
   const tabs = [
@@ -2144,6 +2212,9 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
             workout={selectedWorkout}
             workoutLogs={workoutLogs} setWorkoutLogs={setWorkoutLogs}
             postWorkoutData={postWorkoutData} setPostWorkoutData={setPostWorkoutData}
+            currentIdx={workoutCurrentIdx} setCurrentIdx={setWorkoutCurrentIdx}
+            doneStatus={workoutDoneStatus} setDoneStatus={setWorkoutDoneStatus}
+            skippedStatus={workoutSkippedStatus} setSkippedStatus={setWorkoutSkippedStatus}
             isDark={settings.isDark} accent={accent}
             exerciseLibrary={exerciseLibrary}
             onClose={() => setShowWorkoutModal(false)}
