@@ -1452,6 +1452,7 @@ function WorkoutCarouselModal({
   const completedCount = doneStatus.filter(Boolean).length;
   const skippedCount   = skippedStatus.filter(Boolean).length;
   const allEvaluated   = completedCount + skippedCount === total;
+  const isLastExercise = currentIdx === total - 1;
 
   // ── NOVO: exercício planejado atual — usado para saber o equipamento
   // que o coach definiu para este exercício específico do treino.
@@ -1835,16 +1836,18 @@ function WorkoutCarouselModal({
 
                 <button onClick={() => setShowFeedback(true)}
                   style={{ width: "100%", padding: "11px", borderRadius: 12,
-                    border: `1px solid ${allEvaluated ? color + "66" : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`,
-                    background: allEvaluated ? `${color}14` : "transparent",
-                    color: allEvaluated ? color : "var(--muted)",
-                    fontFamily: "inherit", fontWeight: allEvaluated ? 700 : 500,
+                    border: `1px solid ${(allEvaluated || isLastExercise) ? color + "66" : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`,
+                    background: (allEvaluated || isLastExercise) ? `${color}14` : "transparent",
+                    color: (allEvaluated || isLastExercise) ? color : "var(--muted)",
+                    fontFamily: "inherit", fontWeight: (allEvaluated || isLastExercise) ? 700 : 500,
                     fontSize: "0.93em", cursor: "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                     transition: "all .3s" }}>
                   {allEvaluated
-                    ? "✓ Todos avaliados — Ver Resumo Final →"
-                    : `Ver Resumo (${completedCount + skippedCount}/${total} avaliados)`}
+                    ? "✓ Todos avaliados — Salvar Treino →"
+                    : isLastExercise
+                      ? "Finalizar e Salvar Treino →"
+                      : `Ver Resumo (${completedCount + skippedCount}/${total} avaliados)`}
                 </button>
               </div>
             </div>
