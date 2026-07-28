@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier, @typescript-eslint/ban-ts-comment */
 // @ts-nocheck
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   AreaChart, Area, LineChart, Line, BarChart, Bar,
@@ -1281,6 +1281,18 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
   const workouts = sd?.workouts || [];
   const activeWorkout = workouts.find(w => w.id === activeWorkoutId) || null;
 
+  // Divisão por grupo muscular do treino ativo (cruza os exercícios do treino com a biblioteca pelo nome)
+  const muscleBreakdown = useMemo(() => {
+    const exercises = activeWorkout?.exercises || [];
+    const counts = {};
+    exercises.forEach(ex => {
+      const template = exerciseLibrary.find(t => t.name.toLowerCase() === (ex.name || "").toLowerCase());
+      const group = template?.muscleGroup || "Outro";
+      counts[group] = (counts[group] || 0) + 1;
+    });
+    return MUSCLE_GROUPS.filter(g => counts[g]).map(g => ({ group: g, count: counts[g] }));
+  }, [activeWorkout, exerciseLibrary]);
+
   function handleCreateWorkout() {
     if (!current || !newWorkoutForm.name.trim()) { toast("Nome do treino obrigatório.", "error"); return; }
     const newId = Math.max(0, ...workouts.map(w => w.id), 0) + 1;
@@ -1554,6 +1566,26 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
                       <div>
                         <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", fontWeight: 700 }}>Exercícios</div>
                         <div style={{ fontSize: 18, fontWeight: 800, color }}>{(activeWorkout.exercises || []).length}</div>
+                      </div>
+                    </div>
+                  )}
+
+                  {muscleBreakdown.length > 0 && (
+                    <div style={{ marginTop: 10, padding: "12px 16px", borderRadius: 12, background: CARD_BG2, border: `1px solid ${BORDER}` }}>
+                      <div style={{ fontSize: 10, color: MUTED, textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>Divisão por Grupo Muscular</div>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {muscleBreakdown.map(({ group, count }) => {
+                          const gcolor = MUSCLE_COLOR[group] || MUTED;
+                          return (
+                            <span key={group} style={{
+                              display: "flex", alignItems: "center", gap: 6,
+                              padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+                              background: `${gcolor}18`, color: gcolor, border: `1px solid ${gcolor}33`,
+                            }}>
+                              {group} <span style={{ opacity: 0.75, fontWeight: 600 }}>× {count}</span>
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   )}
