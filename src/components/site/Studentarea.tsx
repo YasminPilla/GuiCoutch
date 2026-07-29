@@ -443,7 +443,7 @@ function EditableDropdown({ value, onChange, options, isDark, accent, placeholde
 }
 
 // ─── TAB: TREINOS ─────────────────────────────────────────────────────────
-function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent }: any) {
+function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent, extraSessions = [], inProgressWorkout = null }: any) {
   const [expandedWorkout, setExpandedWorkout] = useState<number | null>(null);
   const workouts = sd?.workouts || [];
 
@@ -453,6 +453,38 @@ function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent }: any) {
   function getColor(name: string) {
     for (const [k, v] of Object.entries(groupColors)) if (name.includes(k)) return v;
     return accent || N;
+  }
+
+  // ── Progresso da rotação: descobre automaticamente o último treino
+  // concluído (mescla sessões do Firestore + locais) e destaca o próximo
+  // da lista, pra ficar fácil ver onde retomar sem precisar marcar nada. ──
+  const remoteSessions: any[] = sd?.workoutSessions || [];
+  const sessionsMap = new Map<string, any>();
+  extraSessions.forEach((s: any) => sessionsMap.set(s.id, s));
+  remoteSessions.forEach((s: any) => { if (!sessionsMap.has(s.id)) sessionsMap.set(s.id, s); });
+
+  const lastDoneByName = new Map<string, any>();
+  sessionsMap.forEach((s: any) => {
+    if (!s.completed) return;
+    const prev = lastDoneByName.get(s.workoutName);
+    if (!prev || new Date(s.date) > new Date(prev.date)) lastDoneByName.set(s.workoutName, s);
+  });
+
+  let lastCompleted: { workout: any; session: any } | null = null;
+  workouts.forEach((w: any) => {
+    const s = lastDoneByName.get(w.name);
+    if (s && (!lastCompleted || new Date(s.date) > new Date(lastCompleted.session.date))) {
+      lastCompleted = { workout: w, session: s };
+    }
+  });
+  const nextWorkout = workouts.length === 0
+    ? null
+    : lastCompleted
+      ? workouts[(workouts.findIndex((w: any) => w.id === lastCompleted!.workout.id) + 1) % workouts.length]
+      : workouts[0];
+
+  function fmtShortDate(d: string) {
+    return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
   }
 
   if (workouts.length === 0) {
@@ -488,12 +520,57 @@ function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent }: any) {
         </div>
       )}
 
+      {inProgressWorkout ? (
+        <div className="card" style={{ marginBottom: 20, borderLeft: `3px solid ${YELLOW}`, background: `${YELLOW}0D` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.79em", fontWeight: 700, color: YELLOW, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>
+                <Clock size={13} /> Treino não concluído
+              </div>
+              <div className="display" style={{ fontSize: "1.29em", fontWeight: 800 }}>{inProgressWorkout.workout.name}</div>
+              <div style={{ fontSize: "0.86em", color: "var(--muted)", marginTop: 2 }}>
+                {inProgressWorkout.doneCount}/{inProgressWorkout.totalCount} exercícios registrados · continue de onde parou
+              </div>
+            </div>
+            <NeonBtn accent={YELLOW} onClick={() => onStartWorkout(inProgressWorkout.workout)}>
+              <Play size={16} fill="currentColor" /> Continuar
+            </NeonBtn>
+          </div>
+        </div>
+      ) : nextWorkout && (
+        <div className="card" style={{ marginBottom: 20, borderLeft: `3px solid ${accent || N}`, background: `${accent || N}0D` }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "0.79em", fontWeight: 700, color: accent || N, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 6 }}>
+                <Zap size={13} /> Próximo treino
+              </div>
+              <div className="display" style={{ fontSize: "1.29em", fontWeight: 800 }}>{nextWorkout.name}</div>
+              <div style={{ fontSize: "0.86em", color: "var(--muted)", marginTop: 2 }}>
+                {lastCompleted
+                  ? `Último concluído: ${lastCompleted.workout.name} em ${fmtShortDate(lastCompleted.session.date)}`
+                  : "Comece por aqui"}
+              </div>
+            </div>
+            <NeonBtn accent={accent} onClick={() => onStartWorkout(nextWorkout)}>
+              <Play size={16} fill="currentColor" /> Continuar
+            </NeonBtn>
+          </div>
+        </div>
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
         {workouts.map((w: any) => {
           const isExpanded = expandedWorkout === w.id;
           const color = getColor(w.name);
+          const isNext = nextWorkout?.id === w.id;
+          const lastDone = lastDoneByName.get(w.name);
+          const isInProgress = inProgressWorkout?.workout?.id === w.id;
           return (
-            <motion.div key={w.id} layout className="card" style={{ borderLeft: `3px solid ${color}`, padding: 0, overflow: "hidden" }}>
+            <motion.div key={w.id} layout className="card"
+              style={{
+                borderLeft: `3px solid ${isInProgress ? YELLOW : color}`, padding: 0, overflow: "hidden",
+                boxShadow: isInProgress ? `0 0 0 1px ${YELLOW}55` : isNext ? `0 0 0 1px ${accent || N}55` : undefined,
+              }}>
               <div style={{ padding: "18px 20px", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}
                 onClick={() => setExpandedWorkout(isExpanded ? null : w.id)}>
                 <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
@@ -501,10 +578,33 @@ function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent }: any) {
                     <Dumbbell size={20} style={{ color }} />
                   </div>
                   <div>
-                    <div style={{ fontSize: "0.79em", color, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 2 }}>{w.day}</div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                      <span style={{ fontSize: "0.79em", color, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.07em" }}>{w.day}</span>
+                      {isInProgress ? (
+                        <span className="badge" style={{ background: `${YELLOW}18`, color: YELLOW }}>
+                          <Clock size={10} /> Não concluído
+                        </span>
+                      ) : isNext && (
+                        <span className="badge" style={{ background: `${accent || N}18`, color: accent || N }}>
+                          <Zap size={10} /> Próximo
+                        </span>
+                      )}
+                    </div>
                     <div className="display" style={{ fontSize: "1.21em", fontWeight: 800 }}>{w.name}</div>
-                    <div style={{ fontSize: "0.86em", color: "var(--muted)", marginTop: 2, display: "flex", gap: 12 }}>
+                    <div style={{ fontSize: "0.86em", color: "var(--muted)", marginTop: 2, display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
                       <span>{(w.exercises || []).length} exercícios</span>
+                      {lastDone && (
+                        <span style={{ display: "flex", alignItems: "center", gap: 4, color: accent || N }}>
+                          <CheckCircle2 size={12} /> Feito em {fmtShortDate(lastDone.date)}
+                        </span>
+                      )}
+                      {isInProgress && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); onStartWorkout(w); }}
+                          style={{ display: "flex", alignItems: "center", gap: 4, color: YELLOW, background: "none", border: "none", padding: 0, fontWeight: 700, textDecoration: "underline" }}>
+                          <Clock size={12} /> {inProgressWorkout.doneCount}/{inProgressWorkout.totalCount} · Continuar
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2005,6 +2105,9 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
   const [workoutCurrentIdx,    setWorkoutCurrentIdx]    = useState(0);
   const [workoutDoneStatus,    setWorkoutDoneStatus]    = useState<boolean[]>([]);
   const [workoutSkippedStatus, setWorkoutSkippedStatus] = useState<boolean[]>([]);
+  // treino iniciado mas ainda não salvo (fechado com X antes de terminar) —
+  // usado pra mostrar "Continuar" na lista mesmo com o modal fechado
+  const [hasUnsavedWorkout,    setHasUnsavedWorkout]    = useState(false);
 
   // ── FIX RELATÓRIOS: cache local das sessões salvas nesta sessão ──────────
   // Evita depender do snapshot do Firestore para mostrar o treino imediatamente
@@ -2031,6 +2134,7 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
       setWorkoutDoneStatus(cache.doneStatus || []);
       setWorkoutSkippedStatus(cache.skippedStatus || []);
       setShowWorkoutModal(true);
+      setHasUnsavedWorkout(true);
     } catch {}
   }, [activeWorkoutKey]);
 
@@ -2080,6 +2184,7 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
           setWorkoutSkippedStatus(cache.skippedStatus || []);
           setShowWorkoutModal(true);
           setShowAdaptiveModal(false);
+          setHasUnsavedWorkout(true);
           return;
         }
       } catch {}
@@ -2104,6 +2209,7 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
     setWorkoutSkippedStatus(exToUse.map(() => false));
     setShowWorkoutModal(true);
     setShowAdaptiveModal(false);
+    setHasUnsavedWorkout(true);
   }
 
   // ── FIX: salva localmente + no Firestore ─────────────────────────────────
@@ -2114,6 +2220,7 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
     onAddWorkoutSession(session);
     // 3. Fecha o modal e limpa o cache do treino em andamento
     setShowWorkoutModal(false);
+    setHasUnsavedWorkout(false);
     try { localStorage.removeItem(activeWorkoutKey); } catch {}
   }
 
@@ -2180,7 +2287,12 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
       <div className="main-content">
         <AnimatePresence mode="wait">
           {tab === "treino" && (
-            <WorkoutTab key="treino" sd={sd} accent={accent}
+            <WorkoutTab key="treino" sd={sd} accent={accent} extraSessions={localSessions}
+              inProgressWorkout={hasUnsavedWorkout && selectedWorkout ? {
+                workout: selectedWorkout,
+                doneCount: workoutDoneStatus.filter(Boolean).length,
+                totalCount: workoutDoneStatus.length,
+              } : null}
               onStartWorkout={handleStartWorkout}
               onAdaptiveWorkout={(w: any) => { setSelectedWorkout(w); setShowAdaptiveModal(true); }} />
           )}
