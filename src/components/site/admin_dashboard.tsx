@@ -929,20 +929,23 @@ function ExerciseEditor({ exercise, onSave, onCancel, accent = N, exerciseLibrar
   const [suggestions,   setSuggestions]   = useState([]);
   const [showDropdown,  setShowDropdown]  = useState(false);
   const [highlighted,   setHighlighted]   = useState(-1);
+  const [groupFilter,   setGroupFilter]   = useState("all");
   const dropdownRef = useRef(null);
   const inputRef    = useRef(null);
 
-  // Filtra biblioteca ao digitar
+  // Filtra biblioteca ao digitar e/ou por grupo muscular selecionado no chip
   useEffect(() => {
     const q = form.name.trim().toLowerCase();
-    if (!q || q.length < 1) { setSuggestions([]); setShowDropdown(false); return; }
-    const matches = exerciseLibrary
-      .filter(t => t.name.toLowerCase().includes(q))
-      .slice(0, 8);
+    let pool = exerciseLibrary;
+    if (groupFilter !== "all") pool = pool.filter(t => t.muscleGroup === groupFilter);
+    // com grupo selecionado, mostra a lista do grupo mesmo sem digitar nada;
+    // sem grupo selecionado, só busca depois que o coach começa a digitar
+    if (!q && groupFilter === "all") { setSuggestions([]); setShowDropdown(false); return; }
+    const matches = (q ? pool.filter(t => t.name.toLowerCase().includes(q)) : pool).slice(0, 8);
     setSuggestions(matches);
     setShowDropdown(matches.length > 0);
     setHighlighted(-1);
-  }, [form.name, exerciseLibrary]);
+  }, [form.name, exerciseLibrary, groupFilter]);
 
   // Fecha ao clicar fora
   useEffect(() => {
@@ -1045,6 +1048,33 @@ function selectSuggestion(template) {
         {/* ── Nome com autocomplete */}
         <div style={{ position: "relative" }}>
           <label style={labelStyle}>Nome do Exercício *</label>
+
+          {/* Filtro por grupo muscular — restringe as sugestões da biblioteca */}
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+            <button type="button" onClick={() => setGroupFilter("all")}
+              style={{
+                padding: "4px 11px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+                background: groupFilter === "all" ? `${accent}22` : CARD_BG2,
+                color: groupFilter === "all" ? accent : MUTED,
+                border: `1px solid ${groupFilter === "all" ? `${accent}55` : BORDER}`,
+                cursor: "pointer",
+              }}>
+              Todos
+            </button>
+            {MUSCLE_GROUPS.map(g => (
+              <button key={g} type="button" onClick={() => setGroupFilter(g)}
+                style={{
+                  padding: "4px 11px", borderRadius: 20, fontSize: 11, fontWeight: 700,
+                  background: groupFilter === g ? `${muscleColors[g] || MUTED}22` : CARD_BG2,
+                  color: groupFilter === g ? (muscleColors[g] || MUTED) : MUTED,
+                  border: `1px solid ${groupFilter === g ? `${muscleColors[g] || MUTED}55` : BORDER}`,
+                  cursor: "pointer",
+                }}>
+                {g}
+              </button>
+            ))}
+          </div>
+
           <div style={{ position: "relative" }}>
             <input
               ref={inputRef}
