@@ -122,6 +122,20 @@ export const EQUIPMENT_OPTIONS = [
   "Kettlebell", "Elástico", "Smith", "Outro",
 ];
 
+// ── NOVO: Treinos Pré-Prontos (modelos reutilizáveis entre alunos) ────────
+export interface WorkoutTemplate {
+  id: string;
+  name: string;
+  category: string;
+  note: string;
+  exercises: Exercise[];
+  createdAt: string;
+}
+
+export const WORKOUT_CATEGORIES = [
+  "Superior", "Inferior", "Full Body", "Push", "Pull", "Força", "Outro",
+];
+
 export interface SharedState {
   users: User[];
   studentsData: Record<number, StudentData>;
@@ -130,6 +144,7 @@ export interface SharedState {
   permissions: any;
   config: any;
   exerciseLibrary: ExerciseTemplate[];
+  workoutTemplates: WorkoutTemplate[];
 }
 
 // ─── DADOS PARA SEMENTE ───────────────────────────────────────────────────
@@ -370,6 +385,7 @@ interface AppContextValue {
   loading: boolean;
   // ── NOVO ──
   exerciseLibrary: ExerciseTemplate[];
+  workoutTemplates: WorkoutTemplate[];
 
   setUsers: (users: User[]) => void;
   setStudentsData: (data: Record<number, StudentData>) => void;
@@ -393,6 +409,10 @@ interface AppContextValue {
   addExerciseTemplate:    (t: ExerciseTemplate) => Promise<void>;
   updateExerciseTemplate: (t: ExerciseTemplate) => Promise<void>;
   deleteExerciseTemplate: (id: string)          => Promise<void>;
+  // ── NOVO: CRUD treinos pré-prontos ──
+  addWorkoutTemplate:    (t: WorkoutTemplate) => Promise<void>;
+  updateWorkoutTemplate: (t: WorkoutTemplate) => Promise<void>;
+  deleteWorkoutTemplate: (id: string)         => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -445,6 +465,7 @@ export function SharedAppProvider({ children }: { children: React.ReactNode }) {
   const [loading,          setLoading]              = useState(true);
   // ── NOVO ──
   const [exerciseLibrary,  setExerciseLibraryLocal] = useState<ExerciseTemplate[]>([]);
+  const [workoutTemplates, setWorkoutTemplatesLocal] = useState<WorkoutTemplate[]>([]);
 
   const usersRef = useRef<User[]>([]);
   useEffect(() => { usersRef.current = users; }, [users]);
@@ -531,6 +552,17 @@ export function SharedAppProvider({ children }: { children: React.ReactNode }) {
           );
         })
       );
+
+      // ── NOVO: Assinatura em tempo real — treinos pré-prontos ───────────
+      unsubs.push(
+        onSnapshot(collection(db, "workoutTemplates"), snap => {
+          setWorkoutTemplatesLocal(
+            snap.docs
+              .map(d => d.data() as WorkoutTemplate)
+              .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
+          );
+        })
+      );
     };
 
     init();
@@ -613,6 +645,24 @@ export function SharedAppProvider({ children }: { children: React.ReactNode }) {
     await deleteDoc(doc(db, "exerciseLibrary", id));
     await addAuditLog(`Exercício "${t?.name}" removido da biblioteca`, "Biblioteca", "warning");
   }, [exerciseLibrary, addAuditLog]);
+
+  // ── NOVO: CRUD dos treinos pré-prontos ─────────────────────────────────────
+
+  const addWorkoutTemplate = useCallback(async (t: WorkoutTemplate) => {
+    await setDoc(doc(db, "workoutTemplates", t.id), t);
+    await addAuditLog(`Modelo de treino "${t.name}" criado`, "Treinos Prontos", "success");
+  }, [addAuditLog]);
+
+  const updateWorkoutTemplate = useCallback(async (t: WorkoutTemplate) => {
+    await setDoc(doc(db, "workoutTemplates", t.id), t, { merge: true });
+    await addAuditLog(`Modelo de treino "${t.name}" atualizado`, "Treinos Prontos");
+  }, [addAuditLog]);
+
+  const deleteWorkoutTemplate = useCallback(async (id: string) => {
+    const t = workoutTemplates.find(w => w.id === id);
+    await deleteDoc(doc(db, "workoutTemplates", id));
+    await addAuditLog(`Modelo de treino "${t?.name}" removido`, "Treinos Prontos", "warning");
+  }, [workoutTemplates, addAuditLog]);
 
   // ── Treinos ───────────────────────────────────────────────────────────────
 
@@ -755,6 +805,7 @@ export function SharedAppProvider({ children }: { children: React.ReactNode }) {
   const value: AppContextValue = {
     users, studentsData, notifications, auditLogs, permissions, config, loading,
     exerciseLibrary,            // ── NOVO ──
+    workoutTemplates,           // ── NOVO ──
     setUsers, setStudentsData,
     setNotifications, setAuditLogs, setPermissions, setConfig,
     updateStudentWorkouts, updateCoachNote,
@@ -766,6 +817,9 @@ export function SharedAppProvider({ children }: { children: React.ReactNode }) {
     addExerciseTemplate,        // ── NOVO ──
     updateExerciseTemplate,     // ── NOVO ──
     deleteExerciseTemplate,     // ── NOVO ──
+    addWorkoutTemplate,         // ── NOVO ──
+    updateWorkoutTemplate,      // ── NOVO ──
+    deleteWorkoutTemplate,      // ── NOVO ──
   };
 
  if (loading) {
@@ -809,6 +863,7 @@ export function useAdminProps() {
     config:                 ctx.config,
     pendingPhotosCount:     ctx.pendingPhotosCount,
     exerciseLibrary:        ctx.exerciseLibrary,        // ── NOVO ──
+    workoutTemplates:       ctx.workoutTemplates,       // ── NOVO ──
     onUsersChange:          ctx.setUsers,
     onStudentsDataChange:   ctx.setStudentsData,
     onNotificationsChange:  ctx.setNotifications,
@@ -823,6 +878,9 @@ export function useAdminProps() {
     addExerciseTemplate:    ctx.addExerciseTemplate,    // ── NOVO ──
     updateExerciseTemplate: ctx.updateExerciseTemplate, // ── NOVO ──
     deleteExerciseTemplate: ctx.deleteExerciseTemplate, // ── NOVO ──
+    addWorkoutTemplate:     ctx.addWorkoutTemplate,     // ── NOVO ──
+    updateWorkoutTemplate:  ctx.updateWorkoutTemplate,  // ── NOVO ──
+    deleteWorkoutTemplate:  ctx.deleteWorkoutTemplate,  // ── NOVO ──
   };
 }
 

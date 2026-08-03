@@ -17,7 +17,7 @@ import {
   Camera, ZoomIn, RefreshCw, ArrowLeft, GripVertical,
   Play, Video, Link, Eye, ChevronUp, RotateCcw, Copy,
   Calendar, CalendarOff, BarChart as BarChartIcon, Layers,
-  BookOpen, Filter, Tag, Zap,
+  BookOpen, Filter, Tag, Zap, Star,
 } from "lucide-react";
 
 import {
@@ -30,8 +30,10 @@ import {
   type ProgressPhoto,
   type WorkoutSession,
   type ExerciseTemplate,
+  type WorkoutTemplate,
   MUSCLE_GROUPS,
   EQUIPMENT_OPTIONS,
+  WORKOUT_CATEGORIES,
 } from "@/components/site/SharedAppState";
 
 // ─── DESIGN TOKENS ────────────────────────────────────────────────────────
@@ -421,6 +423,7 @@ const SIDEBAR_ITEMS = [
     { id: "dashboard",  label: "Dashboard",   icon: BarChart2 },
     { id: "alunos",     label: "Alunos",      icon: Users },
     { id: "treinos",    label: "Treinos",      icon: Dumbbell },
+    { id: "treinos-prontos", label: "Treinos Prontos", icon: Layers },
     { id: "biblioteca", label: "Biblioteca",   icon: BookOpen },
     { id: "fotos",      label: "Fotos",        icon: Camera, badgeKey: "photos" },
     { id: "relatorios", label: "Relatórios",   icon: TrendingUp },
@@ -1288,7 +1291,7 @@ function ExerciseCard({ exercise, index, onEdit, onDelete, accent = N }) {
 
 // ─── TAB: TREINOS ─────────────────────────────────────────────────────────
 // ── ALTERADO: passa exerciseLibrary para ExerciseEditor ──
-function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStudent, onSelectStudent, toast, confirm, exerciseLibrary }) {
+function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStudent, onSelectStudent, toast, confirm, exerciseLibrary, workoutTemplates = [], addWorkoutTemplate }) {
   const students = users.filter(u => u.role === "student");
   const current  = selectedStudent ? students.find(s => s.id === selectedStudent) : null;
   const sd       = current ? studentsData[current.id] : null;
@@ -1299,6 +1302,7 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
   const [editingExercise, setEditingExercise] = useState(null);
   const [showNewWorkout,  setShowNewWorkout]  = useState(false);
   const [newWorkoutForm,  setNewWorkoutForm]  = useState({ name: "", day: "Segunda" });
+  const [showTemplates,   setShowTemplates]   = useState(false);
 
   const DAYS = ["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"];
   const COLORS_BY_KEYWORD = { Superior: BLUE, Inferior: DANGER, Pull: PURPLE, Push: N, Full: TEAL, Força: AMBER };
@@ -1306,6 +1310,11 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
   function getWorkoutColor(name) {
     for (const [k, c] of Object.entries(COLORS_BY_KEYWORD)) if (name.includes(k)) return c;
     return N;
+  }
+
+  function guessCategory(name) {
+    for (const c of WORKOUT_CATEGORIES) if (name.includes(c)) return c;
+    return "Outro";
   }
 
   const workouts = sd?.workouts || [];
@@ -1386,6 +1395,34 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
     toast("Treino duplicado!");
   }
 
+  function handleApplyTemplate(template) {
+    if (!current) return;
+    const newId = Math.max(0, ...workouts.map(w => w.id), 0) + 1;
+    const newWorkout = {
+      id: newId, name: template.name, day: DAYS[0],
+      totalEstimatedTime: (template.exercises || []).reduce((s, e) => s + Number(e.estimatedTime || 0), 0),
+      exercises: (template.exercises || []).map(e => ({ ...e, id: `ex_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` })),
+    };
+    updateStudentWorkouts(current.id, [...workouts, newWorkout]);
+    toast(`Modelo "${template.name}" adicionado para ${current.name}!`);
+  }
+
+  async function handleSaveAsTemplate(w) {
+    if (!addWorkoutTemplate) return;
+    const template = {
+      id: `wt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      name: w.name, category: guessCategory(w.name), note: "",
+      exercises: (w.exercises || []).map(e => ({ ...e, id: `ex_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` })),
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      await addWorkoutTemplate(template);
+      toast(`"${w.name}" salvo em Treinos Prontos!`);
+    } catch (e) {
+      toast("Erro ao salvar modelo.", "error");
+    }
+  }
+
   const color = activeWorkout ? getWorkoutColor(activeWorkout.name) : N;
 
   return (
@@ -1414,10 +1451,44 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
               <div style={{ fontSize: 13, fontWeight: 600 }}>{current.name}</div>
               <div style={{ fontSize: 11, color: N }}>{sd.goal} · {workouts.length} treino(s)</div>
             </div>
-            <Btn size="sm" icon={Plus} onClick={() => setShowNewWorkout(v => !v)}>
-              {showNewWorkout ? "Cancelar" : "Novo Treino"}
-            </Btn>
+            <div style={{ display: "flex", gap: 8 }}>
+              <Btn variant="secondary" size="sm" icon={Layers} onClick={() => { setShowTemplates(v => !v); setShowNewWorkout(false); }}>
+                {showTemplates ? "Cancelar" : "Usar Modelo"}
+              </Btn>
+              <Btn size="sm" icon={Plus} onClick={() => { setShowNewWorkout(v => !v); setShowTemplates(false); }}>
+                {showNewWorkout ? "Cancelar" : "Novo Treino"}
+              </Btn>
+            </div>
           </div>
+
+          <AnimatePresence>
+            {showTemplates && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} style={{ overflow: "hidden" }}>
+                <div className="card" style={{ marginBottom: 14, background: `${BLUE}06`, borderColor: `${BLUE}33` }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: BLUE, display: "flex", alignItems: "center", gap: 6 }}>
+                    <Layers size={14} /> Treinos Prontos ({workoutTemplates.length})
+                  </div>
+                  {workoutTemplates.length === 0 ? (
+                    <div style={{ fontSize: 12, color: MUTED, textAlign: "center", padding: 12 }}>
+                      Nenhum modelo cadastrado ainda. Crie um em "Treinos Prontos".
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {workoutTemplates.map(t => (
+                        <div key={t.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 12px", borderRadius: 10, background: CARD_BG2, border: `1px solid ${BORDER}` }}>
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600 }}>{t.name}</div>
+                            <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{t.category} · {(t.exercises || []).length} exerc.</div>
+                          </div>
+                          <Btn size="sm" icon={Plus} onClick={() => handleApplyTemplate(t)} style={{ flexShrink: 0 }}>Adicionar</Btn>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <AnimatePresence>
             {showNewWorkout && (
@@ -1476,6 +1547,10 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
                         <div style={{ fontSize: 11, color: MUTED, marginTop: 3 }}>{(w.exercises || []).length} exerc.</div>
                       </div>
                       <div style={{ display: "flex", gap: 4, flexShrink: 0, marginLeft: 8 }} onClick={e => e.stopPropagation()}>
+                        <button onClick={() => handleSaveAsTemplate(w)} title="Salvar como modelo (Treinos Prontos)"
+                          style={{ background: "none", border: "none", color: MUTED, cursor: "pointer", padding: 4 }}>
+                          <Star size={13} />
+                        </button>
                         <button onClick={() => handleDuplicateWorkout(w)} title="Duplicar"
                           style={{ background: "none", border: "none", color: MUTED, cursor: "pointer", padding: 4 }}>
                           <Copy size={13} />
@@ -1625,6 +1700,327 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── TAB: TREINOS PRONTOS (NOVO) ─────────────────────────────────────────
+// Modelos de treino reutilizáveis: o coach monta uma vez e aplica a
+// qualquer aluno (cria um novo treino na conta dele) sem precisar recriar
+// os exercícios do zero. Também alimentado pelo botão "Salvar como modelo"
+// dentro da aba Treinos (copia um treino existente de um aluno para cá).
+function TabTreinosProntos({ users, studentsData, updateStudentWorkouts, workoutTemplates, addWorkoutTemplate, updateWorkoutTemplate, deleteWorkoutTemplate, exerciseLibrary, toast, confirm }) {
+  const students = users.filter(u => u.role === "student");
+
+  const [activeTemplateId, setActiveTemplateId] = useState(null);
+  const [editingMeta,      setEditingMeta]      = useState(null);
+  const [addingExercise,   setAddingExercise]   = useState(false);
+  const [editingExercise,  setEditingExercise]  = useState(null);
+  const [showNewTemplate,  setShowNewTemplate]  = useState(false);
+  const [newTemplateForm,  setNewTemplateForm]  = useState({ name: "", category: WORKOUT_CATEGORIES[0] });
+  const [applyingId,       setApplyingId]       = useState(null);
+  const [applyStudentId,   setApplyStudentId]   = useState("");
+  const [applyDay,         setApplyDay]         = useState("Segunda");
+
+  const DAYS = ["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"];
+  const color = BLUE;
+
+  const activeTemplate = workoutTemplates.find(t => t.id === activeTemplateId) || null;
+
+  async function handleCreateTemplate() {
+    if (!newTemplateForm.name.trim()) { toast("Nome do modelo obrigatório.", "error"); return; }
+    const newTemplate = {
+      id: `wt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      name: newTemplateForm.name.trim(), category: newTemplateForm.category, note: "",
+      exercises: [], createdAt: new Date().toISOString(),
+    };
+    try {
+      await addWorkoutTemplate(newTemplate);
+      setActiveTemplateId(newTemplate.id);
+      setShowNewTemplate(false);
+      setNewTemplateForm({ name: "", category: WORKOUT_CATEGORIES[0] });
+      toast("Modelo criado!");
+    } catch (e) {
+      toast("Erro ao criar modelo.", "error");
+    }
+  }
+
+  async function handleSaveMeta() {
+    if (!editingMeta || !activeTemplate) return;
+    try {
+      await updateWorkoutTemplate({ ...activeTemplate, name: editingMeta.name, category: editingMeta.category });
+      setEditingMeta(null);
+      toast("Modelo atualizado!");
+    } catch (e) {
+      toast("Erro ao atualizar modelo.", "error");
+    }
+  }
+
+  async function handleDeleteTemplate(id) {
+    const ok = await confirm("Remover este modelo? Treinos já aplicados a alunos não serão afetados.", { title: "Remover modelo" });
+    if (!ok) return;
+    try {
+      await deleteWorkoutTemplate(id);
+      if (activeTemplateId === id) setActiveTemplateId(null);
+      toast("Modelo removido.", "info");
+    } catch (e) {
+      toast("Erro ao remover modelo.", "error");
+    }
+  }
+
+  async function handleDuplicateTemplate(t) {
+    const dup = {
+      ...t, id: `wt_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`, name: `${t.name} (cópia)`,
+      exercises: (t.exercises || []).map(e => ({ ...e, id: `ex_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` })),
+      createdAt: new Date().toISOString(),
+    };
+    try {
+      await addWorkoutTemplate(dup);
+      toast("Modelo duplicado!");
+    } catch (e) {
+      toast("Erro ao duplicar modelo.", "error");
+    }
+  }
+
+  async function handleSaveExercise(ex) {
+    if (!activeTemplate) return;
+    const existsIdx = activeTemplate.exercises.findIndex(e => e.id === ex.id);
+    const exercises = existsIdx >= 0
+      ? activeTemplate.exercises.map((e, i) => i === existsIdx ? ex : e)
+      : [...activeTemplate.exercises, ex];
+    try {
+      await updateWorkoutTemplate({ ...activeTemplate, exercises });
+      setAddingExercise(false);
+      setEditingExercise(null);
+      toast(existsIdx >= 0 ? "Exercício atualizado!" : "Exercício adicionado!");
+    } catch (e) {
+      toast("Erro ao salvar exercício.", "error");
+    }
+  }
+
+  async function handleDeleteExercise(exId) {
+    if (!activeTemplate) return;
+    const ok = await confirm("Remover exercício do modelo?", { title: "Remover exercício" });
+    if (!ok) return;
+    try {
+      await updateWorkoutTemplate({ ...activeTemplate, exercises: activeTemplate.exercises.filter(e => e.id !== exId) });
+      toast("Exercício removido.", "info");
+    } catch (e) {
+      toast("Erro ao remover exercício.", "error");
+    }
+  }
+
+  function handleApplyToStudent(template) {
+    if (!applyStudentId) { toast("Selecione um aluno.", "error"); return; }
+    const studentId = Number(applyStudentId);
+    const workouts  = studentsData[studentId]?.workouts || [];
+    const newId = Math.max(0, ...workouts.map(w => w.id), 0) + 1;
+    const newWorkout = {
+      id: newId, name: template.name, day: applyDay,
+      totalEstimatedTime: (template.exercises || []).reduce((s, e) => s + Number(e.estimatedTime || 0), 0),
+      exercises: (template.exercises || []).map(e => ({ ...e, id: `ex_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` })),
+    };
+    updateStudentWorkouts(studentId, [...workouts, newWorkout]);
+    const student = users.find(u => u.id === studentId);
+    toast(`"${template.name}" adicionado ao treino de ${student?.name}!`);
+    setApplyingId(null);
+    setApplyStudentId("");
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, flexWrap: "wrap", gap: 10 }}>
+        <div style={{ fontSize: 13, color: MUTED }}>{workoutTemplates.length} modelo(s) de treino cadastrados</div>
+        <Btn size="sm" icon={Plus} onClick={() => setShowNewTemplate(v => !v)}>
+          {showNewTemplate ? "Cancelar" : "Novo Modelo"}
+        </Btn>
+      </div>
+
+      <AnimatePresence>
+        {showNewTemplate && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} style={{ overflow: "hidden" }}>
+            <div className="card" style={{ marginBottom: 14, background: `${N}06`, borderColor: `${N}33` }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 14, color: N }}>Novo Modelo</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, marginBottom: 12 }}>
+                <div>
+                  <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Nome</label>
+                  <input value={newTemplateForm.name} onChange={e => setNewTemplateForm(p => ({ ...p, name: e.target.value }))}
+                    placeholder="Ex: Full Body Iniciante"
+                    style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, outline: "none", width: "100%" }} />
+                </div>
+                <div>
+                  <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Categoria</label>
+                  <select value={newTemplateForm.category} onChange={e => setNewTemplateForm(p => ({ ...p, category: e.target.value }))}
+                    style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, outline: "none", cursor: "pointer" }}>
+                    {WORKOUT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Btn icon={Plus} onClick={handleCreateTemplate} style={{ flex: 1, justifyContent: "center" }}>Criar</Btn>
+                <Btn variant="secondary" onClick={() => setShowNewTemplate(false)} style={{ justifyContent: "center", padding: "12px 16px" }}>Cancelar</Btn>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {workoutTemplates.length === 0 && !showNewTemplate && (
+        <div className="card" style={{ textAlign: "center", padding: 40 }}>
+          <Layers size={32} style={{ color: MUTED, margin: "0 auto 12px" }} />
+          <p style={{ color: MUTED }}>Nenhum modelo de treino ainda.<br />Crie o primeiro acima ou salve um treino existente na aba Treinos (ícone ⭐).</p>
+        </div>
+      )}
+
+      <div style={{ display: "grid", gridTemplateColumns: activeTemplateId ? "260px 1fr" : "1fr", gap: 14 }}>
+        <div>
+          {workoutTemplates.map(t => {
+            const isActive = activeTemplateId === t.id;
+            return (
+              <motion.div key={t.id} layout
+                onClick={() => { setActiveTemplateId(isActive ? null : t.id); setApplyingId(null); }}
+                style={{
+                  padding: "12px 14px", borderRadius: 12, marginBottom: 8, cursor: "pointer",
+                  background: isActive ? `${color}12` : CARD_BG,
+                  border: `1px solid ${isActive ? color + "44" : BORDER}`,
+                  borderLeft: `4px solid ${color}`, transition: "all .2s",
+                }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, color, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 2 }}>{t.category}</div>
+                    <div style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{t.name}</div>
+                    <div style={{ fontSize: 11, color: MUTED, marginTop: 3 }}>{(t.exercises || []).length} exerc.</div>
+                  </div>
+                  <div style={{ display: "flex", gap: 4, flexShrink: 0, marginLeft: 8 }} onClick={e => e.stopPropagation()}>
+                    <button onClick={() => handleDuplicateTemplate(t)} title="Duplicar"
+                      style={{ background: "none", border: "none", color: MUTED, cursor: "pointer", padding: 4 }}>
+                      <Copy size={13} />
+                    </button>
+                    <button onClick={() => handleDeleteTemplate(t.id)} title="Remover"
+                      style={{ background: "none", border: "none", color: DANGER, cursor: "pointer", padding: 4 }}>
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+                <div onClick={e => e.stopPropagation()} style={{ marginTop: 10 }}>
+                  {applyingId === t.id ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      <select value={applyStudentId} onChange={e => setApplyStudentId(e.target.value)}
+                        style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 8, padding: "7px 10px", fontSize: 12, outline: "none", cursor: "pointer" }}>
+                        <option value="">Selecione um aluno...</option>
+                        {students.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                      </select>
+                      <select value={applyDay} onChange={e => setApplyDay(e.target.value)}
+                        style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 8, padding: "7px 10px", fontSize: 12, outline: "none", cursor: "pointer" }}>
+                        {DAYS.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <Btn size="sm" icon={Check} onClick={() => handleApplyToStudent(t)} style={{ flex: 1, justifyContent: "center" }}>Confirmar</Btn>
+                        <Btn size="sm" variant="secondary" onClick={() => setApplyingId(null)} style={{ justifyContent: "center" }}>Cancelar</Btn>
+                      </div>
+                    </div>
+                  ) : (
+                    <Btn size="sm" icon={UserPlus} onClick={() => { setApplyingId(t.id); setApplyStudentId(""); setApplyDay(DAYS[0]); }} style={{ width: "100%", justifyContent: "center" }}>
+                      Aplicar a Aluno
+                    </Btn>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {activeTemplate && (
+          <motion.div key={activeTemplateId} initial={{ opacity: 0, x: 16 }} animate={{ opacity: 1, x: 0 }}>
+            <div className="card" style={{ marginBottom: 14, borderColor: `${color}33`, background: `${color}06` }}>
+              {editingMeta ? (
+                <div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 10, marginBottom: 12 }}>
+                    <div>
+                      <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Nome</label>
+                      <input value={editingMeta.name} onChange={e => setEditingMeta(p => ({ ...p, name: e.target.value }))}
+                        style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, outline: "none", width: "100%" }} />
+                    </div>
+                    <div>
+                      <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Categoria</label>
+                      <select value={editingMeta.category} onChange={e => setEditingMeta(p => ({ ...p, category: e.target.value }))}
+                        style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, outline: "none", cursor: "pointer" }}>
+                        {WORKOUT_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Btn icon={Save} onClick={handleSaveMeta} style={{ justifyContent: "center" }}>Salvar</Btn>
+                    <Btn variant="secondary" onClick={() => setEditingMeta(null)} style={{ justifyContent: "center", padding: "12px 16px" }}>Cancelar</Btn>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: 11, color, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>{activeTemplate.category}</div>
+                    <div className="display" style={{ fontSize: 16, marginBottom: 4 }}>{activeTemplate.name}</div>
+                    <div style={{ fontSize: 12, color: MUTED }}>{(activeTemplate.exercises || []).length} exercício(s)</div>
+                  </div>
+                  <button onClick={() => setEditingMeta({ name: activeTemplate.name, category: activeTemplate.category })}
+                    style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "8px 12px", color: MUTED2, cursor: "pointer", display: "flex", alignItems: "center", gap: 6, fontSize: 12 }}>
+                    <Edit2 size={13} /> Editar
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>
+                  Exercícios <span style={{ fontSize: 11, color: MUTED, fontWeight: 400 }}>({(activeTemplate.exercises || []).length})</span>
+                </div>
+                <Btn size="sm" icon={Plus} onClick={() => { setAddingExercise(true); setEditingExercise(null); }}>
+                  Adicionar
+                </Btn>
+              </div>
+
+              <AnimatePresence>
+                {addingExercise && !editingExercise && (
+                  <ExerciseEditor
+                    exercise={BLANK_EXERCISE()}
+                    accent={color}
+                    exerciseLibrary={exerciseLibrary}
+                    onSave={handleSaveExercise}
+                    onCancel={() => setAddingExercise(false)}
+                  />
+                )}
+              </AnimatePresence>
+
+              {(activeTemplate.exercises || []).length === 0 && !addingExercise && (
+                <div className="card" style={{ textAlign: "center", padding: 28, color: MUTED }}>
+                  <Dumbbell size={24} style={{ margin: "0 auto 8px" }} />
+                  <div style={{ fontSize: 12 }}>Nenhum exercício ainda.<br />Clique em "Adicionar" para buscar da biblioteca.</div>
+                </div>
+              )}
+
+              {(activeTemplate.exercises || []).map((ex, idx) => (
+                <div key={ex.id}>
+                  {editingExercise?.id === ex.id ? (
+                    <ExerciseEditor
+                      exercise={editingExercise}
+                      accent={color}
+                      exerciseLibrary={exerciseLibrary}
+                      onSave={handleSaveExercise}
+                      onCancel={() => setEditingExercise(null)}
+                    />
+                  ) : (
+                    <ExerciseCard
+                      exercise={ex} index={idx} accent={color}
+                      onEdit={e => { setEditingExercise(e); setAddingExercise(false); }}
+                      onDelete={handleDeleteExercise}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </div>
     </div>
   );
 }
@@ -2754,6 +3150,7 @@ export function AdminDashboard({ user, onLogout }) {
     pendingPhotosCount,
     // ── NOVO ──
     exerciseLibrary,
+    workoutTemplates,
     onUsersChange, onStudentsDataChange,
     onNotificationsChange, onAuditLogsChange, onPermissionsChange, onConfigChange,
     updateStudentWorkouts, updateCoachNote,
@@ -2761,6 +3158,7 @@ export function AdminDashboard({ user, onLogout }) {
     addAuditLog,
     // ── NOVO ──
     addExerciseTemplate, updateExerciseTemplate, deleteExerciseTemplate,
+    addWorkoutTemplate, updateWorkoutTemplate, deleteWorkoutTemplate,
   } = useAdminProps();
 
   useEffect(() => {
@@ -2783,6 +3181,7 @@ export function AdminDashboard({ user, onLogout }) {
 
   const tabTitles = {
     dashboard: "Dashboard", alunos: "Alunos", treinos: "Treinos",
+    "treinos-prontos": "Treinos Prontos",
     biblioteca: "Biblioteca de Exercícios",
     fotos: "Fotos de Progresso", relatorios: "Relatórios",
     notificacoes: "Notificações", permissoes: "Permissões",
@@ -2866,6 +3265,21 @@ export function AdminDashboard({ user, onLogout }) {
                   selectedStudent={selectedStudent} onSelectStudent={setSelectedStudent}
                   toast={toast} confirm={confirm}
                   exerciseLibrary={exerciseLibrary}
+                  workoutTemplates={workoutTemplates}
+                  addWorkoutTemplate={addWorkoutTemplate}
+                />
+              )}
+
+              {tab === "treinos-prontos" && (
+                <TabTreinosProntos
+                  users={users} studentsData={studentsData}
+                  updateStudentWorkouts={updateStudentWorkouts}
+                  workoutTemplates={workoutTemplates}
+                  addWorkoutTemplate={addWorkoutTemplate}
+                  updateWorkoutTemplate={updateWorkoutTemplate}
+                  deleteWorkoutTemplate={deleteWorkoutTemplate}
+                  exerciseLibrary={exerciseLibrary}
+                  toast={toast} confirm={confirm}
                 />
               )}
 
