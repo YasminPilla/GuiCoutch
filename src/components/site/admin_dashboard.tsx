@@ -1303,6 +1303,9 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
   const [showNewWorkout,  setShowNewWorkout]  = useState(false);
   const [newWorkoutForm,  setNewWorkoutForm]  = useState({ name: "", day: "Segunda" });
   const [showTemplates,   setShowTemplates]   = useState(false);
+  const [showCopyFrom,    setShowCopyFrom]    = useState(false);
+  const [copySourceId,    setCopySourceId]    = useState("");
+  const [copySelected,    setCopySelected]    = useState({});
 
   const DAYS = ["Segunda","Terça","Quarta","Quinta","Sexta","Sábado","Domingo"];
   const COLORS_BY_KEYWORD = { Superior: BLUE, Inferior: DANGER, Pull: PURPLE, Push: N, Full: TEAL, Força: AMBER };
@@ -1319,6 +1322,17 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
 
   const workouts = sd?.workouts || [];
   const activeWorkout = workouts.find(w => w.id === activeWorkoutId) || null;
+
+  // ── Copiar treinos de outro aluno ──────────────────────────────────────
+  const copySource         = copySourceId ? studentsData[Number(copySourceId)] : null;
+  const copySourceWorkouts = copySource?.workouts || [];
+
+  useEffect(() => {
+    const sel = {};
+    copySourceWorkouts.forEach(w => { sel[w.id] = true; });
+    setCopySelected(sel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [copySourceId]);
 
   // Divisão por grupo muscular do treino ativo (cruza os exercícios do treino com a biblioteca pelo nome)
   const muscleBreakdown = useMemo(() => {
@@ -1407,6 +1421,25 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
     toast(`Modelo "${template.name}" adicionado para ${current.name}!`);
   }
 
+  function handleCopyFromStudent() {
+    if (!current || !copySource) return;
+    const toCopy = copySourceWorkouts.filter(w => copySelected[w.id]);
+    if (toCopy.length === 0) { toast("Selecione ao menos um treino.", "error"); return; }
+    let nextId = Math.max(0, ...workouts.map(w => w.id), 0);
+    const copied = toCopy.map(w => {
+      nextId += 1;
+      return {
+        ...w, id: nextId,
+        exercises: (w.exercises || []).map(e => ({ ...e, id: `ex_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` })),
+      };
+    });
+    updateStudentWorkouts(current.id, [...workouts, ...copied]);
+    const sourceStudent = users.find(u => u.id === Number(copySourceId));
+    toast(`${copied.length} treino(s) copiado(s) de ${sourceStudent?.name} para ${current.name}!`);
+    setShowCopyFrom(false);
+    setCopySourceId("");
+  }
+
   async function handleSaveAsTemplate(w) {
     if (!addWorkoutTemplate) return;
     const template = {
@@ -1451,15 +1484,65 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
               <div style={{ fontSize: 13, fontWeight: 600 }}>{current.name}</div>
               <div style={{ fontSize: 11, color: N }}>{sd.goal} · {workouts.length} treino(s)</div>
             </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <Btn variant="secondary" size="sm" icon={Layers} onClick={() => { setShowTemplates(v => !v); setShowNewWorkout(false); }}>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <Btn variant="secondary" size="sm" icon={Copy} onClick={() => { setShowCopyFrom(v => !v); setShowTemplates(false); setShowNewWorkout(false); }}>
+                {showCopyFrom ? "Cancelar" : "Copiar de Aluno"}
+              </Btn>
+              <Btn variant="secondary" size="sm" icon={Layers} onClick={() => { setShowTemplates(v => !v); setShowCopyFrom(false); setShowNewWorkout(false); }}>
                 {showTemplates ? "Cancelar" : "Usar Modelo"}
               </Btn>
-              <Btn size="sm" icon={Plus} onClick={() => { setShowNewWorkout(v => !v); setShowTemplates(false); }}>
+              <Btn size="sm" icon={Plus} onClick={() => { setShowNewWorkout(v => !v); setShowTemplates(false); setShowCopyFrom(false); }}>
                 {showNewWorkout ? "Cancelar" : "Novo Treino"}
               </Btn>
             </div>
           </div>
+
+          <AnimatePresence>
+            {showCopyFrom && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} style={{ overflow: "hidden" }}>
+                <div className="card" style={{ marginBottom: 14, background: `${PURPLE}06`, borderColor: `${PURPLE}33` }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: PURPLE, display: "flex", alignItems: "center", gap: 6 }}>
+                    <Copy size={14} /> Copiar treinos de outro aluno
+                  </div>
+                  <label style={{ display: "block", fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 5 }}>Aluno de origem</label>
+                  <select value={copySourceId} onChange={e => setCopySourceId(e.target.value)}
+                    style={{ background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, outline: "none", cursor: "pointer", width: "100%", marginBottom: 12 }}>
+                    <option value="">Selecione um aluno...</option>
+                    {students.filter(s => s.id !== current?.id).map(s => (
+                      <option key={s.id} value={s.id}>{s.name} · {(studentsData[s.id]?.workouts || []).length} treino(s)</option>
+                    ))}
+                  </select>
+
+                  {copySourceId && (
+                    copySourceWorkouts.length === 0 ? (
+                      <div style={{ fontSize: 12, color: MUTED, textAlign: "center", padding: 12 }}>Este aluno não tem treinos ainda.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 12 }}>
+                        {copySourceWorkouts.map(w => (
+                          <label key={w.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, background: CARD_BG2, border: `1px solid ${BORDER}`, cursor: "pointer" }}>
+                            <input type="checkbox" checked={!!copySelected[w.id]}
+                              onChange={() => setCopySelected(p => ({ ...p, [w.id]: !p[w.id] }))}
+                              style={{ width: 16, height: 16, cursor: "pointer", flexShrink: 0 }} />
+                            <div style={{ minWidth: 0 }}>
+                              <div style={{ fontSize: 13, fontWeight: 600 }}>{w.name}</div>
+                              <div style={{ fontSize: 11, color: MUTED, marginTop: 2 }}>{w.day} · {(w.exercises || []).length} exerc.</div>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )
+                  )}
+
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <Btn icon={Copy} disabled={!copySourceId || copySourceWorkouts.length === 0} onClick={handleCopyFromStudent} style={{ flex: 1, justifyContent: "center" }}>
+                      Copiar Selecionados
+                    </Btn>
+                    <Btn variant="secondary" onClick={() => { setShowCopyFrom(false); setCopySourceId(""); }} style={{ justifyContent: "center", padding: "12px 16px" }}>Cancelar</Btn>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           <AnimatePresence>
             {showTemplates && (
