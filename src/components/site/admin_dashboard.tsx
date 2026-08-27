@@ -58,10 +58,10 @@ const CHART_TOOLTIP = {
 
 // ─── GLOBAL CSS ───────────────────────────────────────────────────────────
 const GLOBAL_CSS = `
-  @import url('https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@400;500;600&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&display=swap');
   .adm * { box-sizing: border-box; }
   .adm { font-family: 'DM Sans', system-ui, sans-serif; }
-  .adm .display { font-family: 'Syne', sans-serif; font-weight: 800; }
+  .adm .display { font-family: 'DM Sans', system-ui, sans-serif; font-weight: 800; letter-spacing: -.01em; }
   .adm .muted  { color: ${MUTED}; }
   .adm .muted2 { color: ${MUTED2}; }
   .adm .neon   { color: ${N}; }
@@ -725,6 +725,10 @@ function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, o
       password: student.password,
       goal: sd?.goal || "",
       coachNote: sd?.coachNote || "",
+      startWeight: sd?.startWeight ?? 0,
+      currentWeight: sd?.currentWeight ?? 0,
+      height: sd?.height ?? "",
+      monthlyWorkouts: sd?.monthlyWorkouts ?? 0,
     });
     setEditModal(student.id);
   }
@@ -741,7 +745,15 @@ function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, o
     ));
     onStudentsDataChange({
       ...studentsData,
-      [editModal]: { ...studentsData[editModal], goal: editForm.goal, coachNote: editForm.coachNote },
+      [editModal]: {
+        ...studentsData[editModal],
+        goal: editForm.goal,
+        coachNote: editForm.coachNote,
+        startWeight: Number(editForm.startWeight) || 0,
+        currentWeight: Number(editForm.currentWeight) || 0,
+        height: editForm.height === "" ? undefined : Number(editForm.height),
+        monthlyWorkouts: Number(editForm.monthlyWorkouts) || 0,
+      },
     });
     toast("Dados atualizados!");
     setEditModal(null);
@@ -904,6 +916,37 @@ function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, o
           <select value={editForm.goal || ""} onChange={e => setEditForm(p => ({ ...p, goal: e.target.value }))} style={fieldStyle()}>
             {["Perder gordura", "Ganhar massa magra", "Performance", "Condicionamento"].map(g => <option key={g} value={g}>{g}</option>)}
           </select>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Peso Inicial (kg)</label>
+            <input type="number" step="0.1" value={editForm.startWeight ?? ""}
+              onChange={e => setEditForm(p => ({ ...p, startWeight: e.target.value }))}
+              style={fieldStyle()} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Peso Atual (kg)</label>
+            <input type="number" step="0.1" value={editForm.currentWeight ?? ""}
+              onChange={e => setEditForm(p => ({ ...p, currentWeight: e.target.value }))}
+              style={fieldStyle()} />
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 14 }}>
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Altura (cm)</label>
+            <input type="number" step="1" value={editForm.height ?? ""}
+              onChange={e => setEditForm(p => ({ ...p, height: e.target.value }))}
+              style={fieldStyle()} />
+          </div>
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Treinos no Mês</label>
+            <input type="number" step="1" value={editForm.monthlyWorkouts ?? ""}
+              onChange={e => setEditForm(p => ({ ...p, monthlyWorkouts: e.target.value }))}
+              style={fieldStyle()} />
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: MUTED, marginBottom: 20, marginTop: -8 }}>
+          A variação é calculada automaticamente (Peso Atual − Peso Inicial).
         </div>
         <div style={{ marginBottom: 20 }}>
           <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Nota do Coach</label>
@@ -1207,7 +1250,7 @@ function selectSuggestion(template) {
 }
 
 // ─── CARD DE EXERCÍCIO (visualização) ────────────────────────────────────
-function ExerciseCard({ exercise, index, onEdit, onDelete, accent = N }) {
+function ExerciseCard({ exercise, index, onEdit, onDelete, accent = N, onDragStart, onDragEnter, onDrop, onDragEnd, isDragging, isDragOver }) {
   const [showVideo, setShowVideo] = useState(false);
 
   function getYoutubeId(url) {
@@ -1217,11 +1260,31 @@ function ExerciseCard({ exercise, index, onEdit, onDelete, accent = N }) {
   }
   const ytId = getYoutubeId(exercise.videoUrl);
 
+  const draggable = !!(onDragStart && onDragEnter && onDrop);
+
   return (
     <motion.div layout initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
-      style={{ background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 12, overflow: "hidden", marginBottom: 8 }}>
+      onDragEnter={draggable ? (e) => { e.preventDefault(); onDragEnter(index); } : undefined}
+      onDragOver={draggable ? (e) => e.preventDefault() : undefined}
+      onDrop={draggable ? (e) => { e.preventDefault(); onDrop(index); } : undefined}
+      style={{
+        background: CARD_BG, border: `1px solid ${isDragOver ? accent : BORDER}`, borderRadius: 12, overflow: "hidden", marginBottom: 8,
+        opacity: isDragging ? 0.4 : 1,
+        boxShadow: isDragOver ? `0 0 0 1px ${accent}` : undefined,
+      }}>
 
       <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 14px" }}>
+        {draggable && (
+          <div
+            draggable
+            onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("text/plain", String(index)); onDragStart(index); }}
+            onDragEnd={() => onDragEnd && onDragEnd()}
+            title="Arrastar para reordenar"
+            style={{ cursor: "grab", color: MUTED, flexShrink: 0, display: "flex", alignItems: "center" }}
+          >
+            <GripVertical size={16} />
+          </div>
+        )}
         <div style={{ width: 26, height: 26, borderRadius: "50%", background: `${accent}18`, color: accent, fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
           {index + 1}
         </div>
@@ -1300,6 +1363,8 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
   const [editingWorkout,  setEditingWorkout]  = useState(null);
   const [addingExercise,  setAddingExercise]  = useState(false);
   const [editingExercise, setEditingExercise] = useState(null);
+  const [dragIndex,       setDragIndex]       = useState(null);
+  const [dragOverIndex,   setDragOverIndex]   = useState(null);
   const [showNewWorkout,  setShowNewWorkout]  = useState(false);
   const [newWorkoutForm,  setNewWorkoutForm]  = useState({ name: "", day: "Segunda" });
   const [showTemplates,   setShowTemplates]   = useState(false);
@@ -1396,6 +1461,14 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
     const exercises = activeWorkout.exercises.filter(e => e.id !== exId);
     updateStudentWorkouts(current.id, workouts.map(w => w.id === activeWorkoutId ? { ...w, exercises } : w));
     toast("Exercício removido.", "info");
+  }
+
+  function handleReorderExercise(fromIndex, toIndex) {
+    if (!current || !activeWorkout || fromIndex === toIndex) return;
+    const exercises = [...activeWorkout.exercises];
+    const [moved] = exercises.splice(fromIndex, 1);
+    exercises.splice(toIndex, 0, moved);
+    updateStudentWorkouts(current.id, workouts.map(w => w.id === activeWorkoutId ? { ...w, exercises } : w));
   }
 
   function handleDuplicateWorkout(w) {
@@ -1740,6 +1813,16 @@ function TabTreinos({ users, studentsData, updateStudentWorkouts, selectedStuden
                           exercise={ex} index={idx} accent={color}
                           onEdit={e => { setEditingExercise(e); setAddingExercise(false); }}
                           onDelete={handleDeleteExercise}
+                          onDragStart={setDragIndex}
+                          onDragEnter={(i) => { if (i !== dragOverIndex) setDragOverIndex(i); }}
+                          onDrop={(i) => {
+                            if (dragIndex !== null) handleReorderExercise(dragIndex, i);
+                            setDragIndex(null);
+                            setDragOverIndex(null);
+                          }}
+                          onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
+                          isDragging={dragIndex === idx}
+                          isDragOver={dragOverIndex === idx && dragIndex !== idx}
                         />
                       )}
                     </div>
@@ -1799,6 +1882,8 @@ function TabTreinosProntos({ users, studentsData, updateStudentWorkouts, workout
   const [editingMeta,      setEditingMeta]      = useState(null);
   const [addingExercise,   setAddingExercise]   = useState(false);
   const [editingExercise,  setEditingExercise]  = useState(null);
+  const [dragIndex,        setDragIndex]        = useState(null);
+  const [dragOverIndex,    setDragOverIndex]    = useState(null);
   const [showNewTemplate,  setShowNewTemplate]  = useState(false);
   const [newTemplateForm,  setNewTemplateForm]  = useState({ name: "", category: WORKOUT_CATEGORIES[0] });
   const [applyingId,       setApplyingId]       = useState(null);
@@ -1890,6 +1975,18 @@ function TabTreinosProntos({ users, studentsData, updateStudentWorkouts, workout
       toast("Exercício removido.", "info");
     } catch (e) {
       toast("Erro ao remover exercício.", "error");
+    }
+  }
+
+  async function handleReorderExercise(fromIndex, toIndex) {
+    if (!activeTemplate || fromIndex === toIndex) return;
+    const exercises = [...activeTemplate.exercises];
+    const [moved] = exercises.splice(fromIndex, 1);
+    exercises.splice(toIndex, 0, moved);
+    try {
+      await updateWorkoutTemplate({ ...activeTemplate, exercises });
+    } catch (e) {
+      toast("Erro ao reordenar exercícios.", "error");
     }
   }
 
@@ -2096,6 +2193,16 @@ function TabTreinosProntos({ users, studentsData, updateStudentWorkouts, workout
                       exercise={ex} index={idx} accent={color}
                       onEdit={e => { setEditingExercise(e); setAddingExercise(false); }}
                       onDelete={handleDeleteExercise}
+                      onDragStart={setDragIndex}
+                      onDragEnter={(i) => { if (i !== dragOverIndex) setDragOverIndex(i); }}
+                      onDrop={(i) => {
+                        if (dragIndex !== null) handleReorderExercise(dragIndex, i);
+                        setDragIndex(null);
+                        setDragOverIndex(null);
+                      }}
+                      onDragEnd={() => { setDragIndex(null); setDragOverIndex(null); }}
+                      isDragging={dragIndex === idx}
+                      isDragOver={dragOverIndex === idx && dragIndex !== idx}
                     />
                   )}
                 </div>
@@ -2555,6 +2662,17 @@ function TabBiblioteca({ exerciseLibrary, addExerciseTemplate, updateExerciseTem
 }
 
 // ─── HELPERS DE RELATÓRIO ─────────────────────────────────────────────────
+// Datas de sessão são salvas como "YYYY-MM-DD" (sem horário). `new Date("YYYY-MM-DD")`
+// interpreta isso como meia-noite UTC, então em fusos atrás de UTC (ex: Brasil) o dia
+// exibido acaba voltando um dia. Construímos a data em horário local para evitar isso.
+function parseLocalDate(dateStr) {
+  if (typeof dateStr === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+  return new Date(dateStr);
+}
+
 function buildAttendanceCalendar(sessions) {
   const map = {};
   (sessions || []).forEach(s => { if (s.date) map[s.date] = true; });
@@ -2607,7 +2725,7 @@ function AttendanceCalendar({ sessions, accent = N }) {
           if (!d) return <div key={`blank-${i}`} />;
           const dateStr = isoDate(viewYear, viewMonth, d);
           const isPresent = !!attendanceMap[dateStr];
-          const isToday   = dateStr === today.toISOString().split("T")[0];
+          const isToday   = dateStr === isoDate(today.getFullYear(), today.getMonth(), today.getDate());
           return (
             <div key={d} style={{
               aspectRatio: "1", borderRadius: 8,
@@ -2641,7 +2759,7 @@ function SessionDetailModal({ session, onClose, accent = N }) {
     <Modal open={!!session} onClose={onClose} title="Detalhes da Sessão" width={560}>
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
         {[
-          { label: "Data",        value: new Date(session.date).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" }) },
+          { label: "Data",        value: parseLocalDate(session.date).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" }) },
           { label: "Treino",      value: session.workoutName },
           { label: "Duração",     value: `${session.duration} min` },
           { label: "Energia",     value: `${session.energyLevel}/10` },
@@ -2712,7 +2830,7 @@ function TabRelatorios({ users, studentsData, toast }) {
   const avgEnergy = filteredSessions.length
     ? (filteredSessions.reduce((a, s) => a + s.energyLevel, 0) / filteredSessions.length).toFixed(1) : "-";
   const energyChartData = [...filteredSessions].reverse().map(s => ({
-    date: new Date(s.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
+    date: parseLocalDate(s.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }),
     energia: s.energyLevel, fadiga: s.fatigueLevel,
   }));
 
@@ -2885,7 +3003,7 @@ function TabRelatorios({ users, studentsData, toast }) {
                     <div key={session.id} className="card" style={{ borderLeft: `4px solid ${session.completed ? N : DANGER}` }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
                         <div>
-                          <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>{new Date(session.date).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</div>
+                          <div style={{ fontSize: 11, color: MUTED, marginBottom: 4 }}>{parseLocalDate(session.date).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}</div>
                           <div className="display" style={{ fontSize: 14, marginBottom: 2 }}>{session.workoutName}</div>
                           <div style={{ fontSize: 11, color: MUTED }}>Duração: {session.duration} min · {exs.length} exercícios</div>
                         </div>
@@ -2940,7 +3058,7 @@ function TabRelatorios({ users, studentsData, toast }) {
                 <KpiCard icon={CheckCircle2}label="Completos"        value={allSessions.filter(s => s.completed).length} delta="sessões finalizadas" color={N} />
                 <KpiCard icon={AlertCircle} label="Incompletos"      value={allSessions.filter(s => !s.completed).length} delta="sessões interrompidas" color={DANGER} />
                 <KpiCard icon={Activity}    label="Última Sessão"
-                  value={allSessions[0]?.date ? new Date(allSessions[0].date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—"}
+                  value={allSessions[0]?.date ? parseLocalDate(allSessions[0].date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : "—"}
                   delta="data mais recente" color={AMBER} />
               </div>
               <div className="card" style={{ marginBottom: 14 }}>
@@ -2953,7 +3071,7 @@ function TabRelatorios({ users, studentsData, toast }) {
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   {[...presentDates].sort().reverse().map(d => (
                     <div key={d} style={{ padding: "5px 12px", background: `${N}12`, border: `1px solid ${N}33`, borderRadius: 20, fontSize: 12, color: N, fontWeight: 600 }}>
-                      {new Date(d).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" })}
+                      {parseLocalDate(d).toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" })}
                     </div>
                   ))}
                 </div>

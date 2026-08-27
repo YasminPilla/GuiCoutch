@@ -81,6 +81,7 @@ export interface StudentData {
   weeks: number;
   startWeight: number;
   currentWeight: number;
+  height?: number;
   streak: number;
   monthlyWorkouts: number;
   level?: number;

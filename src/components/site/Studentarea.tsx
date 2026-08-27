@@ -72,6 +72,26 @@ const FONT_FAMILY_OPTIONS = [
   { label: "Outfit",          value: "'Outfit', sans-serif" },
 ];
 
+// Datas de sessão/foto/medida são salvas como "YYYY-MM-DD" (sem horário).
+// `new Date("YYYY-MM-DD")` interpreta isso como meia-noite UTC, então em
+// fusos atrás de UTC (ex: Brasil) o dia exibido acaba voltando um dia.
+// Aqui construímos a data em horário local para evitar esse desvio.
+function parseLocalDate(dateStr: string): Date {
+  if (typeof dateStr === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  }
+  return new Date(dateStr);
+}
+
+// Equivalente ao "YYYY-MM-DD" de hoje, mas no fuso local (evita usar
+// toISOString(), que trunca para o dia em UTC e pode adiantar/atrasar
+// a data perto da meia-noite local).
+function todayLocalDateStr(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 const LANGUAGE_OPTIONS = [
   { label: "Português (BR)", value: "pt-BR", flag: "🇧🇷" },
   { label: "English (US)",   value: "en-US", flag: "🇺🇸" },
@@ -467,13 +487,13 @@ function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent, extraSessio
   sessionsMap.forEach((s: any) => {
     if (!s.completed) return;
     const prev = lastDoneByName.get(s.workoutName);
-    if (!prev || new Date(s.date) > new Date(prev.date)) lastDoneByName.set(s.workoutName, s);
+    if (!prev || parseLocalDate(s.date) > parseLocalDate(prev.date)) lastDoneByName.set(s.workoutName, s);
   });
 
   let lastCompleted: { workout: any; session: any } | null = null;
   workouts.forEach((w: any) => {
     const s = lastDoneByName.get(w.name);
-    if (s && (!lastCompleted || new Date(s.date) > new Date(lastCompleted.session.date))) {
+    if (s && (!lastCompleted || parseLocalDate(s.date) > parseLocalDate(lastCompleted.session.date))) {
       lastCompleted = { workout: w, session: s };
     }
   });
@@ -484,7 +504,7 @@ function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent, extraSessio
       : workouts[0];
 
   function fmtShortDate(d: string) {
-    return new Date(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+    return parseLocalDate(d).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
   }
 
   if (workouts.length === 0) {
@@ -677,17 +697,17 @@ function ReportsTab({ sd, accent, extraSessions = [] }: any) {
   extraSessions.forEach((s: any) => allSessionsMap.set(s.id, s));
   remoteSessions.forEach((s: any) => { if (!allSessionsMap.has(s.id)) allSessionsMap.set(s.id, s); });
   const sessions = Array.from(allSessionsMap.values()).sort(
-    (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
+    (a, b) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime()
   );
 
   function getFiltered() {
     const now = new Date();
     return sessions.filter(s => {
       if (useCustomRange) {
-        const d = new Date(s.date);
-        return d >= new Date(dateRange.from) && d <= new Date(dateRange.to);
+        const d = parseLocalDate(s.date);
+        return d >= parseLocalDate(dateRange.from) && d <= parseLocalDate(dateRange.to);
       }
-      const diff = (now.getTime() - new Date(s.date).getTime()) / (1000 * 60 * 60 * 24);
+      const diff = (now.getTime() - parseLocalDate(s.date).getTime()) / (1000 * 60 * 60 * 24);
       if (filterMode === "diario")  return diff < 1;
       if (filterMode === "semanal") return diff < 7;
       if (filterMode === "mensal")  return diff < 31;
@@ -759,7 +779,7 @@ function ReportsTab({ sd, accent, extraSessions = [] }: any) {
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 14, flexWrap: "wrap", gap: 8 }}>
                 <div>
                   <div style={{ fontSize: "0.79em", color: "var(--muted)", marginBottom: 4 }}>
-                    {new Date(s.date).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
+                    {parseLocalDate(s.date).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })}
                   </div>
                   <h4 className="display" style={{ fontSize: "1.21em", fontWeight: 800 }}>{s.workoutName}</h4>
                   <div style={{ fontSize: "0.86em", color: "var(--muted)", marginTop: 4 }}>Duração: {s.duration} min · {(s.exercises || []).length} exercícios</div>
@@ -808,7 +828,7 @@ function ReportsTab({ sd, accent, extraSessions = [] }: any) {
               <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
                   {[
-                    { label: "Data",    value: new Date(selectedSession.date).toLocaleDateString("pt-BR") },
+                    { label: "Data",    value: parseLocalDate(selectedSession.date).toLocaleDateString("pt-BR") },
                     { label: "Duração", value: `${selectedSession.duration} min` },
                     { label: "Energia", value: `${selectedSession.energyLevel}/10` },
                     { label: "Fadiga",  value: `${selectedSession.fatigueLevel}/10` },
@@ -859,7 +879,7 @@ function PhotoUploadModal({ isDark, onClose, onSubmit, accent }: any) {
   const [step, setStep] = useState(1);
   const [newPhoto, setNewPhoto] = useState({
     label: "", angle: "Frontal",
-    date: new Date().toISOString().split("T")[0],
+    date: todayLocalDateStr(),
     file: null as File | null,
     preview: null as string | null,
   });
@@ -990,7 +1010,7 @@ function PhotoUploadModal({ isDark, onClose, onSubmit, accent }: any) {
                 )}
                 <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 24 }}>
                   {[
-                    { label: "Data",    value: new Date(newPhoto.date).toLocaleDateString("pt-BR") },
+                    { label: "Data",    value: parseLocalDate(newPhoto.date).toLocaleDateString("pt-BR") },
                     { label: "Ângulo",  value: newPhoto.angle },
                     { label: "Legenda", value: newPhoto.label || `${newPhoto.angle} · ${newPhoto.date}` },
                   ].map(item => (
@@ -1069,7 +1089,7 @@ function PhotoLightbox({ photo, photos, onClose, onReplace, isDark, accent }: an
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
             <div>
               <div style={{ fontSize: "1.14em", fontWeight: 700, color: "#fff", marginBottom: 4 }}>{current.label}</div>
-              <div style={{ fontSize: "0.86em", color: "rgba(255,255,255,0.5)" }}>{current.angle} · {new Date(current.date).toLocaleDateString("pt-BR")}</div>
+              <div style={{ fontSize: "0.86em", color: "rgba(255,255,255,0.5)" }}>{current.angle} · {parseLocalDate(current.date).toLocaleDateString("pt-BR")}</div>
             </div>
             {photos.length > 1 && <div style={{ fontSize: "0.86em", color: "rgba(255,255,255,0.4)", background: "rgba(255,255,255,0.08)", padding: "4px 12px", borderRadius: 20 }}>{idx + 1} / {photos.length}</div>}
           </div>
@@ -1163,7 +1183,7 @@ function ProgressPhotosTab({ sd, isDark, accent, onSubmitPhoto, onResubmitPhoto 
                 }
                 <div style={{ position: "absolute", top: 10, left: 10, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", padding: "4px 10px", borderRadius: 20, fontSize: "0.79em", fontWeight: 600, color: "#fff" }}>{photo.angle}</div>
                 <div style={{ position: "absolute", top: 10, right: 10, background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)", padding: "4px 10px", borderRadius: 20, fontSize: "0.79em", fontWeight: 600, color }}>
-                  {new Date(photo.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "2-digit" })}
+                  {parseLocalDate(photo.date).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "2-digit" })}
                 </div>
                 {photo.pendingReview && !photo.coachFeedback && (
                   <div style={{ position: "absolute", bottom: 10, left: 10, background: "rgba(245,158,11,0.9)", padding: "3px 10px", borderRadius: 20, fontSize: "0.71em", fontWeight: 700, color: "#000" }}>⏳ Aguardando avaliação</div>
@@ -1175,7 +1195,7 @@ function ProgressPhotosTab({ sd, isDark, accent, onSubmitPhoto, onResubmitPhoto 
 
               <div style={{ padding: "14px 16px" }}>
                 <div style={{ fontSize: "1em", fontWeight: 700, marginBottom: 4 }}>{photo.label}</div>
-                <div style={{ fontSize: "0.79em", color: "var(--muted)", marginBottom: 12 }}>{new Date(photo.date).toLocaleDateString("pt-BR")}</div>
+                <div style={{ fontSize: "0.79em", color: "var(--muted)", marginBottom: 12 }}>{parseLocalDate(photo.date).toLocaleDateString("pt-BR")}</div>
 
                 {photo.coachFeedback ? (
                   <div style={{ background: photo.rejectedByCoach ? `${DANGER}0D` : `${color}0D`, border: `1px solid ${photo.rejectedByCoach ? DANGER : color}25`, borderRadius: 12, padding: "10px 12px", marginBottom: 12 }}>
@@ -1533,6 +1553,7 @@ function WorkoutCarouselModal({
   setDoneStatus,
   skippedStatus,
   setSkippedStatus,
+  startTime,
   isDark,
   onClose,
   onSave,
@@ -1618,10 +1639,20 @@ function WorkoutCarouselModal({
     setWorkoutLogs(next);
   }
 
+  function computeDuration() {
+    if (!startTime) return 0;
+    const elapsedMs = Date.now() - startTime;
+    const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+    // se ficou mais de 1 dia aberto (esqueceu de encerrar), zera em vez de
+    // mostrar uma duração absurda
+    if (elapsedMs <= 0 || elapsedMs > ONE_DAY_MS) return 0;
+    return Math.round(elapsedMs / 60000);
+  }
+
   function handleSave() {
     const session: WorkoutSession = {
       id: `s${Date.now()}`,
-      date: new Date().toISOString().split("T")[0],
+      date: todayLocalDateStr(),
       workoutName: workout.name,
       exercises: workoutLogs.map((l: any) => ({
         exerciseId:   l.exerciseId,
@@ -1640,7 +1671,7 @@ function WorkoutCarouselModal({
       muscleSoreness:   3,
       generalNotes:     postWorkoutData.generalNotes,
       completed:        true,
-      duration:         workout.totalEstimatedTime || 0,
+      duration:         computeDuration(),
       metasBatidas:     completedCount,
       metasNaoAtingidas: skippedCount,
     };
@@ -2105,6 +2136,9 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
   const [workoutCurrentIdx,    setWorkoutCurrentIdx]    = useState(0);
   const [workoutDoneStatus,    setWorkoutDoneStatus]    = useState<boolean[]>([]);
   const [workoutSkippedStatus, setWorkoutSkippedStatus] = useState<boolean[]>([]);
+  // timestamp (ms) de quando o aluno clicou em "Iniciar Treino" — usado pra
+  // calcular a duração real do treino (início → salvar) na Sessão salva.
+  const [workoutStartTime,     setWorkoutStartTime]     = useState<number | null>(null);
   // treino iniciado mas ainda não salvo (fechado com X antes de terminar) —
   // usado pra mostrar "Continuar" na lista mesmo com o modal fechado
   const [hasUnsavedWorkout,    setHasUnsavedWorkout]    = useState(false);
@@ -2133,6 +2167,8 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
       setWorkoutCurrentIdx(cache.currentIdx || 0);
       setWorkoutDoneStatus(cache.doneStatus || []);
       setWorkoutSkippedStatus(cache.skippedStatus || []);
+      // cache antigo pode não ter startTime — usa agora como fallback pra não quebrar
+      setWorkoutStartTime(cache.startTime || Date.now());
       setShowWorkoutModal(true);
       setHasUnsavedWorkout(true);
     } catch {}
@@ -2148,9 +2184,10 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
         currentIdx: workoutCurrentIdx,
         doneStatus: workoutDoneStatus,
         skippedStatus: workoutSkippedStatus,
+        startTime: workoutStartTime,
       }));
     } catch {}
-  }, [activeWorkoutKey, showWorkoutModal, selectedWorkout, workoutLogs, postWorkoutData, workoutCurrentIdx, workoutDoneStatus, workoutSkippedStatus]);
+  }, [activeWorkoutKey, showWorkoutModal, selectedWorkout, workoutLogs, postWorkoutData, workoutCurrentIdx, workoutDoneStatus, workoutSkippedStatus, workoutStartTime]);
 
   const {
     sharedStudentData,
@@ -2182,6 +2219,7 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
           setWorkoutCurrentIdx(cache.currentIdx || 0);
           setWorkoutDoneStatus(cache.doneStatus || []);
           setWorkoutSkippedStatus(cache.skippedStatus || []);
+          setWorkoutStartTime(cache.startTime || Date.now());
           setShowWorkoutModal(true);
           setShowAdaptiveModal(false);
           setHasUnsavedWorkout(true);
@@ -2190,6 +2228,7 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
       } catch {}
     }
     setSelectedWorkout(w);
+    setWorkoutStartTime(Date.now());
     const exToUse = exercises || w.exercises || [];
     setWorkoutLogs(exToUse.map((ex: any) => ({
       exerciseId:   ex.id,
@@ -2221,6 +2260,7 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
     // 3. Fecha o modal e limpa o cache do treino em andamento
     setShowWorkoutModal(false);
     setHasUnsavedWorkout(false);
+    setWorkoutStartTime(null);
     try { localStorage.removeItem(activeWorkoutKey); } catch {}
   }
 
@@ -2330,6 +2370,7 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
             currentIdx={workoutCurrentIdx} setCurrentIdx={setWorkoutCurrentIdx}
             doneStatus={workoutDoneStatus} setDoneStatus={setWorkoutDoneStatus}
             skippedStatus={workoutSkippedStatus} setSkippedStatus={setWorkoutSkippedStatus}
+            startTime={workoutStartTime}
             isDark={settings.isDark} accent={accent}
             exerciseLibrary={exerciseLibrary}
             onClose={() => setShowWorkoutModal(false)}
