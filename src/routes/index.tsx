@@ -67,9 +67,33 @@ function SessionGuard({ currentUser, onInvalid }: { currentUser: User | null; on
   return null;
 }
 
+// Ribbon fixo lembrando o admin que ele está em modo preview e dando um jeito
+// óbvio de voltar, sem depender de entender que o "Sair" do aluno também volta.
+function ViewAsAdminBanner({ studentName, onExit }: { studentName: string; onExit: () => void }) {
+  return (
+    <div style={{
+      position: "sticky", top: 0, zIndex: 9999,
+      background: "#00C96B", color: "#000",
+      padding: "8px 16px", display: "flex", alignItems: "center", justifyContent: "center",
+      gap: 12, fontSize: 13, fontWeight: 600, fontFamily: "'DM Sans', sans-serif",
+      flexWrap: "wrap",
+    }}>
+      <span>Modo admin: visualizando como {studentName}</span>
+      <button onClick={onExit} style={{
+        background: "#000", color: "#fff", border: "none", borderRadius: 8,
+        padding: "4px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer",
+      }}>
+        Voltar ao Admin
+      </button>
+    </div>
+  );
+}
+
 function Index() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => loadStoredUser());
   const [showLoginPage, setShowLoginPage] = useState(false);
+  // Preview "ver como aluno": só usado por um admin logado, não altera a sessão real.
+  const [viewAsStudent, setViewAsStudent] = useState<User | null>(null);
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -80,8 +104,12 @@ function Index() {
   const handleLogout = () => {
     setCurrentUser(null);
     setShowLoginPage(false);
+    setViewAsStudent(null);
     persistUser(null);
   };
+
+  const handleViewAsStudent = (student: User) => setViewAsStudent(student);
+  const handleExitViewAsStudent = () => setViewAsStudent(null);
 
   const handleAccessLogin = () => setShowLoginPage(true);
   const handleBackToHome  = () => setShowLoginPage(false);
@@ -96,8 +124,15 @@ function Index() {
             <LoginPage onLogin={handleLogin} onBackToHome={handleBackToHome} />
           )}
 
-          {!showLoginPage && currentUser?.role === "admin" && (
-            <AdminDashboard user={currentUser} onLogout={handleLogout} />
+          {!showLoginPage && currentUser?.role === "admin" && !viewAsStudent && (
+            <AdminDashboard user={currentUser} onLogout={handleLogout} onViewAsStudent={handleViewAsStudent} />
+          )}
+
+          {!showLoginPage && currentUser?.role === "admin" && viewAsStudent && (
+            <>
+              <ViewAsAdminBanner studentName={viewAsStudent.name} onExit={handleExitViewAsStudent} />
+              <StudentDashboard user={viewAsStudent} onLogout={handleExitViewAsStudent} />
+            </>
           )}
 
           {!showLoginPage && currentUser?.role === "student" && (

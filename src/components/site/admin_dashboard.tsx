@@ -3337,11 +3337,14 @@ function TabConfiguracoes({ config, onConfigChange, auditLogs, onAuditLogsChange
 }
 
 // ─── ADMIN DASHBOARD (ROOT) ───────────────────────────────────────────────
-export function AdminDashboard({ user, onLogout }) {
+export function AdminDashboard({ user, onLogout, onViewAsStudent }) {
   const [tab,             setTab]             = useState("dashboard");
   const [sidebarOpen,     setSidebarOpen]     = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [isMobile,        setIsMobile]        = useState(typeof window !== "undefined" ? window.innerWidth < 768 : false);
+  const [showViewAsMenu,  setShowViewAsMenu]  = useState(false);
+  const viewAsMenuRef = useRef(null);
+  const viewAsBtnRef  = useRef(null);
 
   const { toast, ToastContainer } = useToast();
   const { confirm, ConfirmDialog } = useConfirm();
@@ -3374,6 +3377,20 @@ export function AdminDashboard({ user, onLogout }) {
   }, [sidebarOpen]);
 
   const unreadNotifs = notifications.filter(n => !n.read).length;
+  const activeStudents = users.filter(u => u.role === "student" && u.status !== "inactive");
+
+  // Fecha o menu "ver como aluno" ao clicar fora
+  useEffect(() => {
+    if (!showViewAsMenu) return;
+    const handler = e => {
+      if (viewAsMenuRef.current && !viewAsMenuRef.current.contains(e.target) &&
+          viewAsBtnRef.current && !viewAsBtnRef.current.contains(e.target)) {
+        setShowViewAsMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [showViewAsMenu]);
 
   function handleNavigate(tabId, studentId?) {
     setTab(tabId);
@@ -3442,6 +3459,38 @@ export function AdminDashboard({ user, onLogout }) {
               </button>
               {unreadNotifs > 0 && <span style={{ position: "absolute", top: 6, right: 6, width: 7, height: 7, borderRadius: "50%", background: DANGER }} />}
             </div>
+            {user?.role === "admin" && onViewAsStudent && (
+              <div style={{ position: "relative" }}>
+                <button ref={viewAsBtnRef} onClick={() => setShowViewAsMenu(v => !v)}
+                  style={{ background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 10, padding: "0 12px", height: 40, display: "flex", alignItems: "center", gap: 6, color: MUTED2, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                  <Eye size={14} /> {!isMobile && "Ver como aluno"}
+                </button>
+                {showViewAsMenu && (
+                  <div ref={viewAsMenuRef} style={{
+                    position: "absolute", top: "calc(100% + 6px)", right: 0, zIndex: 200,
+                    background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 12,
+                    width: 240, maxHeight: 320, overflowY: "auto", boxShadow: "0 12px 32px rgba(0,0,0,0.4)",
+                  }}>
+                    <div style={{ padding: "10px 12px", fontSize: 11, color: MUTED, borderBottom: `1px solid ${BORDER}`, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.4 }}>
+                      Visualizar como
+                    </div>
+                    {activeStudents.length === 0 && (
+                      <div style={{ padding: "14px 12px", fontSize: 12.5, color: MUTED }}>Nenhum aluno ativo</div>
+                    )}
+                    {activeStudents.map(s => (
+                      <button key={s.id}
+                        onClick={() => { setShowViewAsMenu(false); onViewAsStudent(s); }}
+                        style={{ width: "100%", textAlign: "left", background: "transparent", border: "none", padding: "9px 12px", display: "flex", alignItems: "center", gap: 10, color: "#f0f0f0", fontSize: 13, cursor: "pointer" }}>
+                        <div style={{ width: 26, height: 26, borderRadius: "50%", background: `${N}22`, color: N, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                          {s.avatar || s.name?.substring(0, 2).toUpperCase()}
+                        </div>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             {!isMobile && <Btn variant="secondary" size="sm" onClick={onLogout} icon={LogOut}>Sair</Btn>}
           </div>
         </header>
