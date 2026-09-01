@@ -16,10 +16,10 @@ export function CTA({ onAccessLogin }: CTAProps) {
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
           className="relative rounded-[1.75rem] md:rounded-[2.5rem] overflow-hidden p-8 sm:p-12 md:p-20 text-center"
-          style={{ boxShadow: '0 0 80px rgba(0,255,136,0.08)' }}
+          style={{ boxShadow: '0 0 80px rgba(225,6,0,0.08)' }}
         >
           <div className="absolute inset-0 bg-gradient-to-br from-neon/10 via-card to-card" />
-          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(0,255,136,0.28),transparent_60%)]" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(225,6,0,0.28),transparent_60%)]" />
           <div className="absolute -inset-px rounded-[1.75rem] md:rounded-[2.5rem] ring-1 ring-inset ring-neon/30" />
 
           <div className="relative">
@@ -27,8 +27,8 @@ export function CTA({ onAccessLogin }: CTAProps) {
               display: "inline-block",
               fontSize: 13, fontWeight: 800,
               letterSpacing: ".18em", textTransform: "uppercase",
-              color: "#00FF88", marginBottom: 20,
-              borderBottom: "1.5px solid rgba(0,255,136,0.35)",
+              color: "#E10600", marginBottom: 20,
+              borderBottom: "1.5px solid rgba(225,6,0,0.35)",
               paddingBottom: 4,
             }}>
               Última chamada
@@ -51,7 +51,7 @@ export function CTA({ onAccessLogin }: CTAProps) {
                 href="https://wa.me/5511959222489"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="group inline-flex items-center justify-center gap-3 rounded-full bg-neon text-black px-8 py-4 md:py-5 font-semibold text-base md:text-lg neon-glow hover:scale-[1.03] transition-all animate-pulse-glow"
+                className="group inline-flex items-center justify-center gap-3 rounded-full bg-neon text-white px-8 py-4 md:py-5 font-semibold text-base md:text-lg neon-glow hover:scale-[1.03] transition-all animate-pulse-glow"
               >
                 <MessageCircle className="h-5 w-5 flex-shrink-0" />
                 Falar com Guilherme

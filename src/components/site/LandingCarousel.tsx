@@ -33,17 +33,17 @@ function MockupDiagnostico() {
         { label: "Objetivos e expectativas", done: false },
       ].map((item) => (
         <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 20, height: 20, borderRadius: 6, border: item.done ? "none" : "1.5px solid rgba(255,255,255,0.12)", background: item.done ? "#00FF88" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: "#000", flexShrink: 0 }}>
+          <div style={{ width: 20, height: 20, borderRadius: 6, border: item.done ? "none" : "1.5px solid rgba(255,255,255,0.12)", background: item.done ? "#E10600" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 800, color: "#fff", flexShrink: 0 }}>
             {item.done && "✓"}
           </div>
-          <span style={{ fontSize: 13, color: item.done ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.45)", textDecoration: item.done ? "line-through" : "none", textDecorationColor: "rgba(0,255,136,0.4)" }}>
+          <span style={{ fontSize: 13, color: item.done ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.45)", textDecoration: item.done ? "line-through" : "none", textDecorationColor: "rgba(225,6,0,0.4)" }}>
             {item.label}
           </span>
         </div>
       ))}
       <div style={{ height: 1, background: "rgba(255,255,255,0.07)" }} />
       <div style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", display: "flex", alignItems: "flex-start", gap: 8, lineHeight: 1.5 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: "#000", background: "#00FF88", padding: "2px 8px", borderRadius: 20, flexShrink: 0 }}>Coach</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: "#E10600", padding: "2px 8px", borderRadius: 20, flexShrink: 0 }}>Coach</span>
         Avaliação postural agendada para Seg.
       </div>
     </div>
@@ -59,10 +59,10 @@ function MockupEstrategia() {
         <div key={w.w}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 5 }}>
             <span style={{ fontSize: 12, color: "rgba(255,255,255,0.55)" }}>{w.w} · {w.focus}</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: "#00FF88" }}>{w.pct}%</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: "#E10600" }}>{w.pct}%</span>
           </div>
           <div style={{ height: 5, background: "rgba(255,255,255,0.07)", borderRadius: 3, overflow: "hidden" }}>
-            <motion.div initial={{ width: 0 }} whileInView={{ width: `${w.pct}%` }} viewport={{ once: true }} transition={{ duration: 0.8 }} style={{ height: "100%", background: "#00FF88", borderRadius: 3 }} />
+            <motion.div initial={{ width: 0 }} whileInView={{ width: `${w.pct}%` }} viewport={{ once: true }} transition={{ duration: 0.8 }} style={{ height: "100%", background: "#E10600", borderRadius: 3 }} />
           </div>
         </div>
       ))}
@@ -82,9 +82,9 @@ function MockupExecucao() {
         <div key={ex.name} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "rgba(255,255,255,0.03)", borderRadius: 12, border: "1px solid rgba(255,255,255,0.06)", opacity: i === 0 ? 1 : 0.6 }}>
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 13, fontWeight: 600 }}>{ex.name}</div>
-            {ex.note && <div style={{ fontSize: 10, color: "#00FF88", marginTop: 2 }}>💡 {ex.note}</div>}
+            {ex.note && <div style={{ fontSize: 10, color: "#E10600", marginTop: 2 }}>💡 {ex.note}</div>}
           </div>
-          <span style={{ fontSize: 12, fontWeight: 700, color: "#00FF88", background: "rgba(0,255,136,0.1)", padding: "3px 8px", borderRadius: 6 }}>{ex.load}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: "#E10600", background: "rgba(225,6,0,0.1)", padding: "3px 8px", borderRadius: 6 }}>{ex.load}</span>
           <span style={{ fontSize: 12, color: "rgba(255,255,255,0.45)" }}>{ex.sets}</span>
         </div>
       ))}
@@ -100,15 +100,15 @@ function MockupAcompanhamento() {
           <div key={k.label} style={{ flex: 1, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "10px 12px" }}>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 4 }}>{k.label}</div>
             <div style={{ fontSize: 20, fontWeight: 800, lineHeight: 1 }}>{k.value}</div>
-            <div style={{ fontSize: 10, color: "#00FF88", marginTop: 3 }}>{k.delta}</div>
+            <div style={{ fontSize: 10, color: "#E10600", marginTop: 3 }}>{k.delta}</div>
           </div>
         ))}
       </div>
       <div style={{ fontSize: 12, color: "rgba(255,255,255,0.65)", display: "flex", alignItems: "flex-start", gap: 8, lineHeight: 1.5 }}>
-        <span style={{ fontSize: 10, fontWeight: 700, color: "#000", background: "#00FF88", padding: "2px 8px", borderRadius: 20, flexShrink: 0 }}>Coach</span>
+        <span style={{ fontSize: 10, fontWeight: 700, color: "#fff", background: "#E10600", padding: "2px 8px", borderRadius: 20, flexShrink: 0 }}>Coach</span>
         Check-in: subimos carga no agachamento. Foca na execução.
       </div>
-      <div style={{ fontSize: 12, color: "#00FF88", background: "rgba(0,255,136,0.08)", border: "1px solid rgba(0,255,136,0.2)", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>Responder ao coach →</div>
+      <div style={{ fontSize: 12, color: "#E10600", background: "rgba(225,6,0,0.08)", border: "1px solid rgba(225,6,0,0.2)", borderRadius: 8, padding: "8px 12px", textAlign: "center" }}>Responder ao coach →</div>
     </div>
   );
 }
@@ -121,7 +121,7 @@ function MockupDashboard() {
           <div key={k.l} style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.07)", borderRadius: 12, padding: "10px 12px" }}>
             <div style={{ fontSize: 9, color: "rgba(255,255,255,0.35)", textTransform: "uppercase", marginBottom: 4 }}>{k.l}</div>
             <div style={{ fontSize: 16, fontWeight: 800 }}>{k.v}</div>
-            <div style={{ fontSize: 10, color: "#00FF88", marginTop: 3 }}>{k.d}</div>
+            <div style={{ fontSize: 10, color: "#E10600", marginTop: 3 }}>{k.d}</div>
           </div>
         ))}
       </div>
@@ -164,9 +164,9 @@ function MockupBiblioteca() {
 // ─── SLIDES DATA ──────────────────────────────────────────────────────────
 
 const SLIDES = [
-  { id: 1, icon: Search,   accent: "#00FF88", headline: "Nada de treino padrão.",           description: "Antes de qualquer estratégia, analisamos histórico, limitações, rotina e objetivos.", chips: ["Avaliação", "Objetivos", "Rotina"],     mockup: <MockupDiagnostico /> },
-  { id: 2, icon: Map,      accent: "#00FF88", headline: "Você sempre sabe o próximo passo.", description: "Planejamento estruturado com metas claras e progressão inteligente.",               chips: ["Mesociclos", "Metas", "Progressão"],   mockup: <MockupEstrategia /> },
-  { id: 3, icon: Dumbbell, accent: "#00FF88", headline: "Treinos feitos para você.",         description: "Cada sessão possui execução, carga, repetições e progressão definidas.",            chips: ["Carga", "Execução", "Cadência"],       mockup: <MockupExecucao /> },
+  { id: 1, icon: Search,   accent: "#E10600", headline: "Nada de treino padrão.",           description: "Antes de qualquer estratégia, analisamos histórico, limitações, rotina e objetivos.", chips: ["Avaliação", "Objetivos", "Rotina"],     mockup: <MockupDiagnostico /> },
+  { id: 2, icon: Map,      accent: "#E10600", headline: "Você sempre sabe o próximo passo.", description: "Planejamento estruturado com metas claras e progressão inteligente.",               chips: ["Mesociclos", "Metas", "Progressão"],   mockup: <MockupEstrategia /> },
+  { id: 3, icon: Dumbbell, accent: "#E10600", headline: "Treinos feitos para você.",         description: "Cada sessão possui execução, carga, repetições e progressão definidas.",            chips: ["Carga", "Execução", "Cadência"],       mockup: <MockupExecucao /> },
   { id: 4, icon: LineChart, accent: "#00D4FF", headline: "Você não evolui sozinho.",         description: "Check-ins, ajustes e suporte contínuo para manter a evolução.",                    chips: ["Check-ins", "Suporte", "Ajustes"],     mockup: <MockupAcompanhamento /> },
   { id: 5, icon: Video,    accent: "#00D4FF", headline: "Nunca mais execute errado.",        description: "Vídeos demonstrativos e orientações técnicas para todos os exercícios.",            chips: ["Vídeos", "Técnica", "Execução"],       mockup: <MockupBiblioteca /> },
   { id: 6, icon: BarChart2, accent: "#00D4FF", headline: "Sua evolução em tempo real.",     description: "Peso, medidas, frequência, metas e progresso organizados em um único painel.",     chips: ["Peso", "Medidas", "Dashboard"],        mockup: <MockupDashboard /> },
@@ -238,7 +238,7 @@ export function LandingCarousel() {
         }
         .lc-progress-fill {
           height: 100%;
-          background: linear-gradient(90deg, #00FF88, #00D4FF);
+          background: linear-gradient(90deg, #E10600, #00D4FF);
         }
 
         /* ── GRID TRAVADO ── */
@@ -331,8 +331,8 @@ export function LandingCarousel() {
               display: "inline-block",
               fontSize: 13, fontWeight: 800,
               letterSpacing: ".18em", textTransform: "uppercase",
-              color: "#00FF88", marginBottom: 16,
-              borderBottom: "1.5px solid rgba(0,255,136,0.35)",
+              color: "#E10600", marginBottom: 16,
+              borderBottom: "1.5px solid rgba(225,6,0,0.35)",
               paddingBottom: 4,
             }}>
               Sistema GC
@@ -435,7 +435,7 @@ export function LandingCarousel() {
               <div className="lc-dots">
                 {SLIDES.map((_, i) => {
                   const isCurrent = i === current;
-                  const dotColor = i < 3 ? "#00FF88" : "#00D4FF";
+                  const dotColor = i < 3 ? "#E10600" : "#00D4FF";
                   return (
                     <button
                       key={i}

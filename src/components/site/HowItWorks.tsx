@@ -26,7 +26,7 @@ const steps = [
 export function HowItWorks() {
   return (
     <section id="como-funciona" className="relative py-28 px-6 overflow-hidden">
-      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_left,rgba(0,255,136,0.05),transparent_55%)]" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_left,rgba(225,6,0,0.05),transparent_55%)]" />
 
       <div className="mx-auto max-w-6xl">
         <motion.div
@@ -40,8 +40,8 @@ export function HowItWorks() {
             display: "inline-block",
             fontSize: 13, fontWeight: 800,
             letterSpacing: ".18em", textTransform: "uppercase",
-            color: "#00FF88", marginBottom: 16,
-            borderBottom: "1.5px solid rgba(0,255,136,0.35)",
+            color: "#E10600", marginBottom: 16,
+            borderBottom: "1.5px solid rgba(225,6,0,0.35)",
             paddingBottom: 4,
           }}>
             Simples assim
@@ -57,7 +57,7 @@ export function HowItWorks() {
         <div className="grid md:grid-cols-3 gap-6 relative">
           <div
             className="hidden md:block absolute top-10 left-[calc(16.66%+16px)] right-[calc(16.66%+16px)] h-px"
-            style={{ background: "linear-gradient(90deg, transparent, rgba(0,255,136,0.3), transparent)" }}
+            style={{ background: "linear-gradient(90deg, transparent, rgba(225,6,0,0.3), transparent)" }}
           />
 
           {steps.map((step, i) => {
@@ -78,12 +78,12 @@ export function HowItWorks() {
                   flexDirection: "column",
                   gap: 20,
                   position: "relative",
-                  boxShadow: 'inset 0 1px 0 rgba(0,255,136,0.1)'
+                  boxShadow: 'inset 0 1px 0 rgba(225,6,0,0.1)'
                 }}
               >
                 <div style={{
                   position: "absolute", top: -16, left: 28,
-                  background: "#00FF88", color: "#000",
+                  background: "#E10600", color: "#fff",
                   fontWeight: 800, fontSize: 12,
                   letterSpacing: "0.1em",
                   borderRadius: 99,
@@ -95,12 +95,12 @@ export function HowItWorks() {
 
                 <div style={{
                   width: 48, height: 48,
-                  background: "rgba(0,255,136,0.1)",
+                  background: "rgba(225,6,0,0.1)",
                   borderRadius: 14,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   marginTop: 8,
                 }}>
-                  <Icon size={22} color="#00FF88" strokeWidth={1.5} />
+                  <Icon size={22} color="#E10600" strokeWidth={1.5} />
                 </div>
 
                 <div>
@@ -125,7 +125,7 @@ export function HowItWorks() {
         >
           <a
             href="#quiz"
-            className="inline-flex items-center gap-2 rounded-full bg-neon text-black px-8 py-4 font-semibold neon-glow hover:scale-[1.02] transition-all text-sm"
+            className="inline-flex items-center gap-2 rounded-full bg-neon text-white px-8 py-4 font-semibold neon-glow hover:scale-[1.02] transition-all text-sm"
           >
             Fazer o diagnóstico gratuito
           </a>

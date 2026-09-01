@@ -147,7 +147,6 @@ interface LeadForm {
   nivel: string;
   diasSemana: string;
   temAcademia: string;
-  usaSuplemento: string;
   limitacao: string;
   cidade: string;
   preferencia: string;
@@ -161,7 +160,6 @@ const emptyForm: LeadForm = {
   nivel: "",
   diasSemana: "",
   temAcademia: "",
-  usaSuplemento: "",
   limitacao: "",
   cidade: "",
   preferencia: "",
@@ -229,7 +227,6 @@ function LeadModal({ quizAnswers, profile, onClose }: LeadModalProps) {
     if (!form.nivel) newErrors.nivel = "Selecione seu nível";
     if (!form.diasSemana) newErrors.diasSemana = "Selecione os dias disponíveis";
     if (!form.temAcademia) newErrors.temAcademia = "Selecione uma opção";
-    if (!form.usaSuplemento) newErrors.usaSuplemento = "Selecione uma opção";
     if (!form.cidade.trim()) newErrors.cidade = "Informe sua cidade";
     if (!form.preferencia) newErrors.preferencia = "Selecione uma preferência";
     setErrors(newErrors);
@@ -253,7 +250,6 @@ function LeadModal({ quizAnswers, profile, onClose }: LeadModalProps) {
       `*Nível:* ${form.nivel}`,
       `*Dias disponíveis:* ${form.diasSemana}`,
       `*Acesso à academia:* ${form.temAcademia}`,
-      `*Usa suplemento:* ${form.usaSuplemento}`,
       `*Cidade:* ${form.cidade}`,
       `*Preferência de acompanhamento:* ${getModalityLabel(form.preferencia)}`,
       `*Plano de interesse:* ${form.planoInteresse || "Não informado"}`,
@@ -288,7 +284,7 @@ function LeadModal({ quizAnswers, profile, onClose }: LeadModalProps) {
             transition={{ type: "spring", stiffness: 260, damping: 20, delay: 0.1 }}
             style={{ display: "inline-flex", marginBottom: 24 }}
           >
-            <CheckCircle size={56} color="#00FF88" strokeWidth={1.5} />
+            <CheckCircle size={56} color="#E10600" strokeWidth={1.5} />
           </motion.div>
 
           <h3 style={{ fontWeight: 700, fontSize: 26, marginBottom: 12 }}>
@@ -302,7 +298,7 @@ function LeadModal({ quizAnswers, profile, onClose }: LeadModalProps) {
             onClick={onClose}
             style={{
               display: "inline-flex", alignItems: "center", gap: 8,
-              background: "#00FF88", color: "#000", border: "none",
+              background: "#E10600", color: "#fff", border: "none",
               borderRadius: 99, padding: "12px 28px",
               fontWeight: 700, fontSize: 14, cursor: "pointer",
             }}
@@ -319,7 +315,7 @@ function LeadModal({ quizAnswers, profile, onClose }: LeadModalProps) {
     <ModalShell onClose={onClose}>
       {/* Header */}
       <div style={{ padding: "28px 28px 0", borderBottom: "1px solid rgba(255,255,255,0.07)", paddingBottom: 20, marginBottom: 4 }}>
-        <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#00FF88", marginBottom: 6 }}>
+        <p style={{ fontSize: 11, fontWeight: 800, letterSpacing: "0.18em", textTransform: "uppercase", color: "#E10600", marginBottom: 6 }}>
           Quase lá
         </p>
         <h3 style={{ fontWeight: 700, fontSize: 22, lineHeight: 1.3, margin: 0 }}>
@@ -394,16 +390,6 @@ function LeadModal({ quizAnswers, profile, onClose }: LeadModalProps) {
           </select>
         </Field>
 
-        {/* Suplemento */}
-        <Field label="Usa suplemento atualmente? *" error={errors.usaSuplemento}>
-          <select style={selectStyle} value={form.usaSuplemento} onChange={(e) => set("usaSuplemento", e.target.value)}>
-            <option value="">Selecione</option>
-            <option value="Sim">Sim</option>
-            <option value="Não">Não</option>
-            <option value="Quero entender mais">Quero entender mais</option>
-          </select>
-        </Field>
-
         {/* Limitação */}
         <Field label="Limitação física ou lesão? (opcional)">
           <input
@@ -456,11 +442,11 @@ function LeadModal({ quizAnswers, profile, onClose }: LeadModalProps) {
             marginTop: 8,
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
             width: "100%",
-            background: "#00FF88", color: "#000",
+            background: "#E10600", color: "#fff",
             border: "none", borderRadius: 12,
             padding: "14px 0",
             fontWeight: 700, fontSize: 15, cursor: "pointer",
-            boxShadow: "0 0 24px rgba(0,255,136,0.35)",
+            boxShadow: "0 0 24px rgba(225,6,0,0.35)",
           }}
         >
           <Send size={16} /> Enviar e aguardar contato
@@ -590,15 +576,15 @@ export function Quiz() {
 
       {/* ── Quiz section ── */}
       <section id="quiz" className="relative py-32 px-6">
-        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,rgba(0,255,136,0.05),transparent_60%)]" />
+        <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_center,rgba(225,6,0,0.05),transparent_60%)]" />
         <div className="mx-auto max-w-4xl">
           <div className="text-center mb-12">
             <p style={{
               display: "inline-block",
               fontSize: 13, fontWeight: 800,
               letterSpacing: ".18em", textTransform: "uppercase",
-              color: "#00FF88", marginBottom: 16,
-              borderBottom: "1.5px solid rgba(0,255,136,0.35)",
+              color: "#E10600", marginBottom: 16,
+              borderBottom: "1.5px solid rgba(225,6,0,0.35)",
               paddingBottom: 4,
             }}>
               Diagnóstico em 60 segundos
@@ -613,7 +599,7 @@ export function Quiz() {
             <div className="absolute top-0 left-0 right-0 h-[3px] bg-white/5">
               <motion.div
                 className="h-full"
-                style={{ background: "#00FF88" }}
+                style={{ background: "#E10600" }}
                 animate={{ width: `${progress}%` }}
                 transition={{ duration: 0.45, ease: "easeOut" }}
               />
@@ -681,9 +667,9 @@ export function Quiz() {
                   {/* animated ring */}
                   <div className="relative mx-auto h-20 w-20 mb-8">
                     <svg className="absolute inset-0 -rotate-90" viewBox="0 0 80 80">
-                      <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(0,255,136,0.15)" strokeWidth="3" />
+                      <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(225,6,0,0.15)" strokeWidth="3" />
                       <motion.circle
-                        cx="40" cy="40" r="34" fill="none" stroke="#00FF88" strokeWidth="3" strokeLinecap="round"
+                        cx="40" cy="40" r="34" fill="none" stroke="#E10600" strokeWidth="3" strokeLinecap="round"
                         strokeDasharray={`${2 * Math.PI * 34}`}
                         initial={{ strokeDashoffset: 2 * Math.PI * 34 }}
                         animate={{ strokeDashoffset: 0 }}
@@ -702,7 +688,7 @@ export function Quiz() {
                       whileHover={{ scale: 1.04 }}
                       whileTap={{ scale: 0.97 }}
                       onClick={() => setModalOpen(true)}
-                      className="inline-flex items-center gap-2 rounded-full bg-neon text-black px-7 py-3.5 font-semibold neon-glow text-sm"
+                      className="inline-flex items-center gap-2 rounded-full bg-neon text-white px-7 py-3.5 font-semibold neon-glow text-sm"
                       style={{ border: "none", cursor: "pointer" }}
                     >
                       Quero começar agora

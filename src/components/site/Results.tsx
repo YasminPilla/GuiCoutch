@@ -21,8 +21,8 @@ export function Results() {
               display: "inline-block",
               fontSize: 13, fontWeight: 800,
               letterSpacing: ".18em", textTransform: "uppercase",
-              color: "#00FF88", marginBottom: 12,
-              borderBottom: "1.5px solid rgba(0,255,136,0.35)",
+              color: "#E10600", marginBottom: 12,
+              borderBottom: "1.5px solid rgba(225,6,0,0.35)",
               paddingBottom: 4,
             }}>Prova social</p>
             <h2 className="font-display text-4xl md:text-6xl font-bold leading-tight">

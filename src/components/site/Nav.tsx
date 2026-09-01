@@ -19,7 +19,7 @@ interface NavProps {
 const navLinks = [
   { href: "#metodo", label: "Método" },
   { href: "#quiz", label: "Quiz" },
-  { href: "#resultados", label: "Resultados" },
+  { href: "#antes-depois", label: "Resultados" },
   { href: "#about", label: "Sobre" },
 ];
 
@@ -94,7 +94,7 @@ export function Nav({ onAccessLogin, currentUser, onLogout }: NavProps) {
             }}
           >
             <img
-              src="/logo.png"
+              src="/logo_red_512.png"
               alt="GC Logo"
               style={{
                 width: 45,
@@ -139,8 +139,8 @@ export function Nav({ onAccessLogin, currentUser, onLogout }: NavProps) {
                     whiteSpace: "nowrap",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.color = "#00FF88";
-                    e.currentTarget.style.background = "rgba(0,255,136,0.08)";
+                    e.currentTarget.style.color = "#E10600";
+                    e.currentTarget.style.background = "rgba(225,6,0,0.08)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.color = "rgba(255,255,255,0.5)";
@@ -211,9 +211,9 @@ export function Nav({ onAccessLogin, currentUser, onLogout }: NavProps) {
                     whiteSpace: "nowrap",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(0,255,136,0.4)";
-                    e.currentTarget.style.color = "#00FF88";
-                    e.currentTarget.style.background = "rgba(0,255,136,0.07)";
+                    e.currentTarget.style.borderColor = "rgba(225,6,0,0.4)";
+                    e.currentTarget.style.color = "#E10600";
+                    e.currentTarget.style.background = "rgba(225,6,0,0.07)";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.borderColor = "rgba(255,255,255,0.2)";
@@ -234,24 +234,24 @@ export function Nav({ onAccessLogin, currentUser, onLogout }: NavProps) {
                 fontFamily: "'DM Sans', sans-serif",
                 fontWeight: 600,
                 fontSize: 14,
-                color: "#000",
-                background: "#00FF88",
+                color: "#fff",
+                background: "#E10600",
                 border: "none",
                 borderRadius: 999,
                 padding: "8px 22px",
                 cursor: "pointer",
-                boxShadow: "0 0 18px rgba(0,255,136,0.4)",
+                boxShadow: "0 0 18px rgba(225,6,0,0.4)",
                 textDecoration: "none",
                 whiteSpace: "nowrap",
                 transition: "opacity 0.2s, box-shadow 0.2s",
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.opacity = "0.88";
-                e.currentTarget.style.boxShadow = "0 0 28px rgba(0,255,136,0.65)";
+                e.currentTarget.style.boxShadow = "0 0 28px rgba(225,6,0,0.65)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.opacity = "1";
-                e.currentTarget.style.boxShadow = "0 0 18px rgba(0,255,136,0.4)";
+                e.currentTarget.style.boxShadow = "0 0 18px rgba(225,6,0,0.4)";
               }}
             >
               Começar
@@ -328,7 +328,7 @@ export function Nav({ onAccessLogin, currentUser, onLogout }: NavProps) {
                 zIndex: 50,
                 background: "rgba(8,8,8,0.92)",
                 WebkitBackdropFilter: "blur(24px)",
-                border: "1px solid rgba(0,255,136,0.1)",
+                border: "1px solid rgba(225,6,0,0.1)",
                 borderRadius: 20,
                 overflow: "hidden",
                 padding: "8px 0",
@@ -352,15 +352,15 @@ export function Nav({ onAccessLogin, currentUser, onLogout }: NavProps) {
                     transition: "background 0.15s, color 0.15s",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "rgba(0,255,136,0.06)";
-                    e.currentTarget.style.color = "#00FF88";
+                    e.currentTarget.style.background = "rgba(225,6,0,0.06)";
+                    e.currentTarget.style.color = "#E10600";
                   }}
                   onMouseLeave={(e) => {
                     e.currentTarget.style.background = "transparent";
                     e.currentTarget.style.color = "rgba(255,255,255,0.5)";
                   }}
                 >
-                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#00FF88", flexShrink: 0 }} />
+                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: "#E10600", flexShrink: 0 }} />
                   {link.label}
                 </a>
               ))}
@@ -413,13 +413,13 @@ export function Nav({ onAccessLogin, currentUser, onLogout }: NavProps) {
                     fontFamily: "'DM Sans', sans-serif",
                     fontWeight: 600,
                     fontSize: 14,
-                    color: "#000",
-                    background: "#00FF88",
+                    color: "#fff",
+                    background: "#E10600",
                     border: "none",
                     borderRadius: 999,
                     padding: "9px 0",
                     cursor: "pointer",
-                    boxShadow: "0 0 14px rgba(0,255,136,0.4)",
+                    boxShadow: "0 0 14px rgba(225,6,0,0.4)",
                     textDecoration: "none",
                     textAlign: "center",
                     display: "block",

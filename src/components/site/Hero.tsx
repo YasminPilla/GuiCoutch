@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 import { motion } from "framer-motion";
 import { ArrowRight, Play } from "lucide-react";
-import heroImg from "@/assets/hero-trainer.jpg";
+import heroImg from "@/assets/shape/depois-3.jpg";
 
 const stats = [
   { v: "850+", l: "Alunos transformados" },
@@ -14,8 +14,8 @@ export function Hero() {
     <section id="top" className="relative min-h-screen overflow-hidden pt-24 md:pt-28 pb-16 md:pb-20 grain">
       {/* Background gradient */}
       <div className="absolute inset-0 -z-10">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(0,255,136,0.12),transparent_50%)]" />
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(0,255,136,0.05),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(225,6,0,0.12),transparent_50%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_bottom_left,rgba(225,6,0,0.05),transparent_50%)]" />
       </div>
 
       <div className="mx-auto max-w-7xl px-4 md:px-6 grid lg:grid-cols-12 gap-8 md:gap-12 items-center">
@@ -37,15 +37,13 @@ export function Hero() {
             transition={{ duration: 0.8, delay: 0.1 }}
             className="font-display text-4xl sm:text-5xl md:text-7xl lg:text-8xl font-bold leading-[0.93] tracking-tight"
           >
-            Transforme<br />
-            seu corpo com{" "}
-            <br className="sm:hidden" />
+            O treino manda{" "}
             <span className="relative inline-block">
-              <span className="text-neon">método</span>
+              <span className="text-neon">em tudo</span>
               <svg className="absolute -bottom-2 left-0 w-full" height="10" viewBox="0 0 200 10">
-                <path d="M0 5 Q 100 -5 200 5" stroke="#00FF88" strokeWidth="2.5" fill="none" />
+                <path d="M0 5 Q 100 -5 200 5" stroke="#E10600" strokeWidth="2.5" fill="none" />
               </svg>
-            </span>.
+            </span>!
           </motion.h1>
 
           <motion.p
@@ -54,8 +52,7 @@ export function Hero() {
             transition={{ duration: 0.8, delay: 0.25 }}
             className="mt-6 md:mt-8 text-base md:text-lg text-muted-foreground max-w-xl leading-relaxed"
           >
-            Acompanhamento personalizado para resultados reais — treino,
-            evolução e suporte contínuo numa plataforma profissional de alto desempenho.
+            Treino individualizado, direto ao ponto — sem fórmula pronta.
           </motion.p>
 
           <motion.div
@@ -66,13 +63,13 @@ export function Hero() {
           >
             <a
               href="#quiz"
-              className="group inline-flex items-center justify-center gap-2 rounded-full bg-neon text-black px-7 py-4 font-semibold neon-glow hover:scale-[1.02] transition-all"
+              className="group inline-flex items-center justify-center gap-2 rounded-full bg-neon text-white px-7 py-4 font-semibold neon-glow hover:scale-[1.02] transition-all"
             >
               Começar Agora
               <ArrowRight className="h-4 w-4 group-hover:translate-x-1 transition-transform" />
             </a>
             <a
-              href="#resultados"
+              href="#antes-depois"
               className="inline-flex items-center justify-center gap-2 rounded-full glass px-7 py-4 font-medium hover:bg-white/5 transition-all"
             >
               <Play className="h-4 w-4 text-neon" />
@@ -109,9 +106,10 @@ export function Hero() {
             <img
               src={heroImg}
               alt="Guilherme Couto, personal trainer"
-              className="absolute inset-0 h-full w-full object-cover object-top"
-              width={1080}
-              height={1440}
+              className="absolute inset-0 h-full w-full object-cover"
+              style={{ transform: "scale(1.9)", transformOrigin: "68% 47%" }}
+              width={1200}
+              height={1600}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
             <div className="absolute inset-0 ring-1 ring-inset ring-white/10 rounded-2xl md:rounded-3xl" />

@@ -7,7 +7,7 @@ import { Quiz } from "@/components/site/Quiz";
 import { Plans } from "@/components/site/Plans";
 import { MicroProducts } from "@/components/site/MicroProducts";
 import { HowItWorks } from "@/components/site/HowItWorks";
-import { Results } from "@/components/site/Results";
+import { BeforeAfter } from "@/components/site/BeforeAfter";
 import { CTA } from "@/components/site/CTA";
 import { LandingCarousel } from "@/components/site/LandingCarousel";
 import { Footer } from "@/components/site/Footer";
@@ -159,7 +159,7 @@ function Index() {
           <SectionDivider />
           <HowItWorks />
           <SectionDivider />
-          <Results />
+          <BeforeAfter />
           <SectionDivider />
           <About />
           <SectionDivider />

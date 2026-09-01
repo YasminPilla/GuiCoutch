@@ -1,9 +1,10 @@
 /* eslint-disable prettier/prettier */
 import { motion } from "framer-motion";
 import { CheckCircle2, Target } from "lucide-react";
+import profileImg from "@/assets/shape/depois-3.jpg";
 
 const credentials = [
-  "Bacharel em Educação Física — UNESP",
+  "Bacharelado em Educação Física — UNESP, Rio Claro",
 ];
 
 const specialities = [
@@ -26,7 +27,7 @@ export function About() {
         /* ── Container principal ── */
         .ab {
           padding: 80px 24px;
-          background: linear-gradient(135deg, rgba(0,255,136,0.02) 0%, rgba(0,0,0,0) 100%);
+          background: linear-gradient(135deg, rgba(225,6,0,0.02) 0%, rgba(0,0,0,0) 100%);
           font-family: 'Inter', sans-serif;
         }
         .ab-inner {
@@ -56,8 +57,8 @@ export function About() {
           width: 100%;
           aspect-ratio: 3/4;
           border-radius: 24px;
-          background: linear-gradient(135deg, rgba(0,255,136,0.08) 0%, rgba(0,255,136,0.02) 100%);
-          border: 1.5px solid rgba(0,255,136,0.25);
+          background: linear-gradient(135deg, rgba(225,6,0,0.08) 0%, rgba(225,6,0,0.02) 100%);
+          border: 1.5px solid rgba(225,6,0,0.25);
           display: flex;
           flex-direction: column;
           align-items: center;
@@ -65,7 +66,7 @@ export function About() {
           gap: 12px;
           position: relative;
           overflow: hidden;
-          box-shadow: 0 8px 32px rgba(0,255,136,0.08);
+          box-shadow: 0 8px 32px rgba(225,6,0,0.08);
           transition: all 0.3s ease;
         }
         @media (max-width: 768px) {
@@ -75,20 +76,21 @@ export function About() {
           }
         }
         .ab-photo:hover {
-          border-color: rgba(0,255,136,0.4);
-          box-shadow: 0 12px 48px rgba(0,255,136,0.15);
+          border-color: rgba(225,6,0,0.4);
+          box-shadow: 0 12px 48px rgba(225,6,0,0.15);
         }
-        .ab-photo-logo {
-          width: 90px;
-          height: 90px;
-          object-fit: contain;
-          opacity: 0.9;
+        .ab-photo-img {
+          position: absolute;
+          inset: 0;
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
         }
-        .ab-photo-hint {
-          font-size: 12px;
-          color: rgba(255,255,255,0.35);
-          font-weight: 400;
-          font-family: 'Inter', sans-serif;
+        .ab-photo-fade {
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg, rgba(11,11,11,0) 45%, rgba(11,11,11,0.85) 100%);
+          pointer-events: none;
         }
         .ab-photo-badge {
           position: absolute;
@@ -97,7 +99,7 @@ export function About() {
           right: 16px;
           background: rgba(10,10,10,0.92);
           backdrop-filter: blur(12px);
-          border: 1px solid rgba(0,255,136,0.2);
+          border: 1px solid rgba(225,6,0,0.2);
           border-radius: 14px;
           padding: 12px 14px;
           display: flex;
@@ -119,7 +121,7 @@ export function About() {
         }
         .ab-badge-role {
           font-size: 11px;
-          color: #00FF88;
+          color: #E10600;
           margin-top: 2px;
           font-weight: 400;
           font-family: 'Inter', sans-serif;
@@ -132,9 +134,9 @@ export function About() {
           font-weight: 600;
           letter-spacing: 0.2em;
           text-transform: uppercase;
-          color: #00FF88;
+          color: #E10600;
           margin-bottom: 16px;
-          border-bottom: 2px solid rgba(0,255,136,0.4);
+          border-bottom: 2px solid rgba(225,6,0,0.4);
           padding-bottom: 6px;
           font-family: 'Manrope', sans-serif;
         }
@@ -175,14 +177,14 @@ export function About() {
           flex-wrap: wrap;
           padding: 24px 28px;
           background: rgba(255,255,255,0.04);
-          border: 1px solid rgba(0,255,136,0.15);
+          border: 1px solid rgba(225,6,0,0.15);
           border-radius: 16px;
           backdrop-filter: blur(8px);
           transition: all 0.3s ease;
         }
         .ab-stats:hover {
           background: rgba(255,255,255,0.06);
-          border-color: rgba(0,255,136,0.25);
+          border-color: rgba(225,6,0,0.25);
         }
         .ab-stat {
           display: flex;
@@ -193,7 +195,7 @@ export function About() {
         .ab-stat-value {
           font-size: 28px;
           font-weight: 800;
-          color: #00FF88;
+          color: #E10600;
           line-height: 1;
           margin-bottom: 6px;
           font-family: 'Manrope', sans-serif;
@@ -222,7 +224,7 @@ export function About() {
         /* ── Card Formação ── */
         .ab-creds-card {
           background: linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%);
-          border: 1px solid rgba(0,255,136,0.15);
+          border: 1px solid rgba(225,6,0,0.15);
           border-radius: 18px;
           padding: 28px;
           backdrop-filter: blur(8px);
@@ -230,8 +232,8 @@ export function About() {
         }
         .ab-creds-card:hover {
           background: linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.04) 100%);
-          border-color: rgba(0,255,136,0.3);
-          box-shadow: 0 8px 32px rgba(0,255,136,0.1);
+          border-color: rgba(225,6,0,0.3);
+          box-shadow: 0 8px 32px rgba(225,6,0,0.1);
         }
         .ab-card-title {
           font-size: 12px;
@@ -249,7 +251,7 @@ export function About() {
           content: '';
           width: 3px;
           height: 12px;
-          background: #00FF88;
+          background: #E10600;
           border-radius: 2px;
         }
         .ab-cred {
@@ -268,7 +270,7 @@ export function About() {
           margin-bottom: 0;
         }
         .ab-cred svg {
-          color: #00FF88;
+          color: #E10600;
           flex-shrink: 0;
         }
         .ab-divider {
@@ -279,8 +281,8 @@ export function About() {
 
         /* ── Card Depoimento ── */
         .ab-quote-card {
-          background: linear-gradient(135deg, rgba(0,255,136,0.06) 0%, rgba(0,255,136,0.02) 100%);
-          border: 1.5px solid rgba(0,255,136,0.2);
+          background: linear-gradient(135deg, rgba(225,6,0,0.06) 0%, rgba(225,6,0,0.02) 100%);
+          border: 1.5px solid rgba(225,6,0,0.2);
           border-radius: 18px;
           padding: 28px;
           display: flex;
@@ -290,9 +292,9 @@ export function About() {
           transition: all 0.3s ease;
         }
         .ab-quote-card:hover {
-          background: linear-gradient(135deg, rgba(0,255,136,0.08) 0%, rgba(0,255,136,0.03) 100%);
-          border-color: rgba(0,255,136,0.35);
-          box-shadow: 0 8px 32px rgba(0,255,136,0.12);
+          background: linear-gradient(135deg, rgba(225,6,0,0.08) 0%, rgba(225,6,0,0.03) 100%);
+          border-color: rgba(225,6,0,0.35);
+          box-shadow: 0 8px 32px rgba(225,6,0,0.12);
         }
         .ab-quote-text {
           font-size: 15px;
@@ -306,7 +308,7 @@ export function About() {
         .ab-quote-text::before {
           content: '"';
           font-size: 32px;
-          color: #00FF88;
+          color: #E10600;
           margin-right: 4px;
           line-height: 0.5;
           font-family: 'Manrope', sans-serif;
@@ -332,7 +334,7 @@ export function About() {
         }
         .ab-quote-role {
           font-size: 11px;
-          color: #00FF88;
+          color: #E10600;
           margin-top: 2px;
           font-weight: 400;
           font-family: 'Inter', sans-serif;
@@ -353,13 +355,18 @@ export function About() {
               viewport={{ once: true }}
               transition={{ duration: 0.7 }}
             >
-              <img src="/logo.png" alt="GC Fitness" className="ab-photo-logo" />
-              <span className="ab-photo-hint">Sua foto aqui</span>
+              <img
+                src={profileImg}
+                alt="Guilherme Couto, personal trainer"
+                className="ab-photo-img"
+                style={{ transform: "scale(2.6)", transformOrigin: "66% 32%" }}
+              />
+              <div className="ab-photo-fade" />
               <div className="ab-photo-badge">
-                <img src="/logo.png" alt="GC" className="ab-badge-logo" />
+                <img src="/logo_red_512.png" alt="GC" className="ab-badge-logo" />
                 <div>
                   <div className="ab-badge-name">Guilherme Couto</div>
-                  <div className="ab-badge-role">Personal · CREF ativo</div>
+                  <div className="ab-badge-role">Personal · CREF 098765-G/SP</div>
                 </div>
               </div>
             </motion.div>
@@ -376,9 +383,9 @@ export function About() {
                 Guilherme Couto.
               </h2>
               <p className="ab-bio">
-                Comecei na academia aos 17 anos tentando entender por que os mesmos treinos
-                funcionavam para uns e não para outros. Oito anos depois, a resposta continua
-                sendo a mesma: <strong>individualização, consistência e dados</strong>.
+                Formado em <strong>Bacharelado em Educação Física pela UNESP – Rio Claro</strong>,
+                trabalho com treinamento personalizado — desenvolvido de acordo com os
+                objetivos, necessidades e rotina de cada aluno.
               </p>
 
               <div className="ab-stats">
@@ -423,11 +430,11 @@ export function About() {
 
             <div className="ab-quote-card">
               <p className="ab-quote-text">
-                Treino bom não é o mais pesado, nem o mais complexo. É o que você consegue executar bem, semana após semana.
+                Meu foco é um acompanhamento individualizado e estratégico — força, hipertrofia, estética ou condicionamento. Cada treino é planejado para você evoluir com segurança. Não tem treino Ctrl+C Ctrl+V!
               </p>
 
               <div  className="ab-quote-author">
-                <img src="/logo.png" alt="GC" className="ab-quote-logo" />
+                <img src="/logo_red_512.png" alt="GC" className="ab-quote-logo" />
                 <div>
                   <div className="ab-quote-name">Guilherme Couto</div>
                   <div className="ab-quote-role">Coach GC Fitness</div>
