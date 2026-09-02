@@ -17,7 +17,7 @@ import {
   Camera, ZoomIn, RefreshCw, ArrowLeft, GripVertical,
   Play, Video, Link, Eye, ChevronUp, RotateCcw, Copy,
   Calendar, CalendarOff, BarChart as BarChartIcon, Layers,
-  BookOpen, Filter, Tag, Zap, Star,
+  BookOpen, Filter, Tag, Zap, Star, ClipboardList,
 } from "lucide-react";
 
 import {
@@ -31,6 +31,9 @@ import {
   type WorkoutSession,
   type ExerciseTemplate,
   type WorkoutTemplate,
+  type Survey,
+  type SurveyQuestion,
+  type SurveyResponse,
   MUSCLE_GROUPS,
   EQUIPMENT_OPTIONS,
   WORKOUT_CATEGORIES,
@@ -2799,7 +2802,7 @@ function SessionDetailModal({ session, onClose, accent = N }) {
 }
 
 // ─── TAB: RELATÓRIOS ──────────────────────────────────────────────────────
-function TabRelatorios({ users, studentsData, toast }) {
+function TabRelatorios({ users, studentsData, toast, confirm, surveys, surveyResponses, addSurvey, sendSurvey, deleteSurvey }) {
   const students = users.filter(u => u.role === "student");
   const [selectedStudentId, setSelectedStudentId] = useState(students[0]?.id || null);
   const [viewMode,          setViewMode]          = useState("overview");
@@ -2855,15 +2858,23 @@ function TabRelatorios({ users, studentsData, toast }) {
             { id: "overview",   label: "Visão Geral",  icon: BarChart2 },
             { id: "sessions",   label: "Sessões",       icon: Dumbbell },
             { id: "attendance", label: "Presença",      icon: Calendar },
+            { id: "surveys",    label: "Pesquisas",     icon: ClipboardList },
           ].map(m => (
             <button key={m.id} onClick={() => setViewMode(m.id)} className={`tab-btn${viewMode === m.id ? " active" : ""}`} style={{ display: "flex", alignItems: "center", gap: 5 }}>
               <m.icon size={13} /> {m.label}
             </button>
           ))}
         </div>
-        <Btn variant="secondary" size="sm" icon={Download} onClick={exportCSV}>Exportar CSV</Btn>
+        {viewMode !== "surveys" && <Btn variant="secondary" size="sm" icon={Download} onClick={exportCSV}>Exportar CSV</Btn>}
       </div>
 
+      {viewMode === "surveys" && (
+        <SurveysPanel users={users} surveys={surveys} surveyResponses={surveyResponses}
+          addSurvey={addSurvey} sendSurvey={sendSurvey} deleteSurvey={deleteSurvey} toast={toast} confirm={confirm} />
+      )}
+
+      {viewMode !== "surveys" && (
+      <>
       <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
         <select value={selectedStudentId || ""} onChange={e => setSelectedStudentId(Number(e.target.value) || null)}
           style={{ background: CARD_BG, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 10, padding: "9px 12px", fontSize: 13, cursor: "pointer", outline: "none" }}>
@@ -3105,7 +3116,408 @@ function TabRelatorios({ users, studentsData, toast }) {
           )}
         </>
       )}
+      </>
+      )}
       <SessionDetailModal session={selectedSession} onClose={() => setSelectedSession(null)} accent={N} />
+    </div>
+  );
+}
+
+// ─── PESQUISAS: painel (lista + criação + resultados) ────────────────────
+const SURVEY_QUESTION_TYPES = [
+  { value: "text",     label: "Texto aberto" },
+  { value: "single",   label: "Múltipla escolha (única)" },
+  { value: "multiple", label: "Múltipla escolha (várias)" },
+  { value: "scale",    label: "Escala (1–10)" },
+];
+
+function SurveysPanel({ users, surveys, surveyResponses, addSurvey, sendSurvey, deleteSurvey, toast, confirm }) {
+  const [showBuilder,   setShowBuilder]   = useState(false);
+  const [sendingSurvey, setSendingSurvey] = useState(null);
+  const [viewingSurvey, setViewingSurvey] = useState(null);
+  const students = users.filter(u => u.role === "student");
+
+  async function handleCreate(survey) {
+    try {
+      await addSurvey(survey);
+      setShowBuilder(false);
+      toast(`Pesquisa "${survey.title}" salva como rascunho.`);
+    } catch (e) {
+      toast("Erro ao criar pesquisa.", "error");
+    }
+  }
+
+  async function handleSend(opts) {
+    try {
+      await sendSurvey(sendingSurvey.id, opts);
+      toast(`Pesquisa "${sendingSurvey.title}" enviada!`);
+      setSendingSurvey(null);
+    } catch (e) {
+      toast("Erro ao enviar pesquisa.", "error");
+    }
+  }
+
+  async function handleDelete(survey) {
+    const ok = await confirm(`Excluir a pesquisa "${survey.title}"? As respostas recebidas serão perdidas.`, { title: "Excluir pesquisa" });
+    if (!ok) return;
+    try {
+      await deleteSurvey(survey.id);
+      toast("Pesquisa excluída.", "info");
+    } catch (e) {
+      toast("Erro ao excluir pesquisa.", "error");
+    }
+  }
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16, gap: 10, flexWrap: "wrap" }}>
+        <div style={{ fontSize: 13, color: MUTED }}>{surveys.length} pesquisa(s) criada(s)</div>
+        <Btn icon={Plus} size="sm" onClick={() => setShowBuilder(true)}>Nova Pesquisa</Btn>
+      </div>
+
+      {surveys.length === 0 && (
+        <div className="card" style={{ textAlign: "center", padding: 40, color: MUTED }}>
+          <ClipboardList size={32} style={{ margin: "0 auto 12px" }} />
+          <div>Nenhuma pesquisa criada ainda</div>
+        </div>
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {surveys.map(s => {
+          const isSent = s.status === "sent";
+          const responses = surveyResponses.filter(r => r.surveyId === s.id);
+          const totalRecipients = s.sendToAll ? students.length : s.recipientIds.length;
+          return (
+            <div key={s.id} className="card">
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 200 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>{s.title}</div>
+                    {!isSent && <Badge variant="amber">Rascunho</Badge>}
+                  </div>
+                  {s.description && <div style={{ fontSize: 12, color: MUTED, marginBottom: 8 }}>{s.description}</div>}
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11, color: MUTED2 }}>
+                    <span>{s.questions.length} pergunta(s)</span>
+                    <span>·</span>
+                    <span>{isSent ? (s.sendToAll ? "Todos os alunos" : `${s.recipientIds.length} aluno(s) selecionado(s)`) : "Ainda não enviada"}</span>
+                    <span>·</span>
+                    <span>{new Date(s.createdAt).toLocaleDateString("pt-BR")}</span>
+                  </div>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+                  {isSent && (
+                    <Badge variant={totalRecipients > 0 && responses.length >= totalRecipients ? "green" : "amber"}>
+                      {responses.length}/{totalRecipients} respostas
+                    </Badge>
+                  )}
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {isSent ? (
+                      <Btn size="sm" variant="secondary" icon={Eye} onClick={() => setViewingSurvey(s)}>Respostas</Btn>
+                    ) : (
+                      <Btn size="sm" icon={Send} onClick={() => setSendingSurvey(s)}>Enviar</Btn>
+                    )}
+                    <Btn size="sm" variant="danger" icon={Trash2} onClick={() => handleDelete(s)} style={{ padding: "8px 10px" }} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <Modal open={showBuilder} onClose={() => setShowBuilder(false)} title="Nova Pesquisa" width={620}>
+        {showBuilder && <SurveyBuilder onSave={handleCreate} onCancel={() => setShowBuilder(false)} />}
+      </Modal>
+
+      <Modal open={!!sendingSurvey} onClose={() => setSendingSurvey(null)} title="Enviar Pesquisa" width={520}>
+        {sendingSurvey && <SendSurveyModal survey={sendingSurvey} students={students} onSend={handleSend} onCancel={() => setSendingSurvey(null)} />}
+      </Modal>
+
+      <Modal open={!!viewingSurvey} onClose={() => setViewingSurvey(null)} title={viewingSurvey?.title || ""} width={620}>
+        {viewingSurvey && (
+          <SurveyResults survey={viewingSurvey} responses={surveyResponses.filter(r => r.surveyId === viewingSurvey.id)} students={students} />
+        )}
+      </Modal>
+    </div>
+  );
+}
+
+function SurveyBuilder({ onSave, onCancel }: { onSave: (s: Survey) => void; onCancel: () => void }) {
+  const [title,       setTitle]       = useState("");
+  const [description, setDescription] = useState("");
+  const [questions,   setQuestions]   = useState<SurveyQuestion[]>([{ id: `q${Date.now()}`, type: "text", question: "", options: [] }]);
+  const [error,       setError]       = useState("");
+
+  const inputStyle = { background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 8, padding: "9px 12px", fontSize: 13, outline: "none", fontFamily: "'DM Sans', sans-serif", width: "100%" };
+  const labelStyle = { display: "block", fontSize: 10, fontWeight: 700, color: MUTED, textTransform: "uppercase" as const, letterSpacing: ".06em", marginBottom: 5 };
+
+  function addQuestion() {
+    setQuestions(qs => [...qs, { id: `q${Date.now()}_${qs.length}`, type: "text", question: "", options: [] }]);
+  }
+  function removeQuestion(id: string) {
+    setQuestions(qs => qs.filter(q => q.id !== id));
+  }
+  function updateQuestion(id: string, patch: Partial<SurveyQuestion>) {
+    setQuestions(qs => qs.map(q => q.id === id ? { ...q, ...patch } : q));
+  }
+  function setQuestionType(id: string, type: string) {
+    updateQuestion(id, { type: type as any, options: (type === "single" || type === "multiple") ? ["", ""] : [] });
+  }
+  function addOption(qid: string) {
+    setQuestions(qs => qs.map(q => q.id === qid ? { ...q, options: [...(q.options || []), ""] } : q));
+  }
+  function updateOption(qid: string, idx: number, value: string) {
+    setQuestions(qs => qs.map(q => q.id === qid ? { ...q, options: (q.options || []).map((o, i) => i === idx ? value : o) } : q));
+  }
+  function removeOption(qid: string, idx: number) {
+    setQuestions(qs => qs.map(q => q.id === qid ? { ...q, options: (q.options || []).filter((_, i) => i !== idx) } : q));
+  }
+
+  function handleSave() {
+    if (!title.trim()) { setError("Título é obrigatório."); return; }
+    if (questions.length === 0) { setError("Adicione pelo menos uma pergunta."); return; }
+    for (const q of questions) {
+      if (!q.question.trim()) { setError("Todas as perguntas precisam de um texto."); return; }
+      if (q.type === "single" || q.type === "multiple") {
+        const opts = (q.options || []).map(o => o.trim()).filter(Boolean);
+        if (opts.length < 2) { setError(`A pergunta "${q.question}" precisa de pelo menos 2 opções.`); return; }
+      }
+    }
+
+    const survey: Survey = {
+      id: `survey_${Date.now()}`,
+      title: title.trim(),
+      description: description.trim(),
+      questions: questions.map(q => {
+        const isChoice = q.type === "single" || q.type === "multiple";
+        return {
+          id: q.id,
+          type: q.type,
+          question: q.question.trim(),
+          // Firestore rejeita valores "undefined" em setDoc — omite o campo em vez de setá-lo.
+          ...(isChoice ? { options: (q.options || []).map(o => o.trim()).filter(Boolean) } : {}),
+        };
+      }),
+      status: "draft",
+      sendToAll: false,
+      recipientIds: [],
+      createdAt: new Date().toISOString(),
+    };
+    onSave(survey);
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div>
+        <label style={labelStyle}>Título da pesquisa *</label>
+        <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Ex: Satisfação com o programa de treino" style={inputStyle} />
+      </div>
+      <div>
+        <label style={labelStyle}>Descrição (opcional)</label>
+        <textarea rows={2} value={description} onChange={e => setDescription(e.target.value)} placeholder="Contexto ou instruções para o aluno"
+          style={{ ...inputStyle, resize: "vertical" }} />
+      </div>
+
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <label style={{ ...labelStyle, marginBottom: 0 }}>Perguntas</label>
+          <Btn size="sm" variant="secondary" icon={Plus} onClick={addQuestion}>Adicionar pergunta</Btn>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          {questions.map((q, i) => (
+            <div key={q.id} style={{ border: `1px solid ${BORDER}`, borderRadius: 12, padding: 12, background: CARD_BG }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 8, alignItems: "flex-start" }}>
+                <span style={{ fontSize: 11, color: MUTED, fontWeight: 700, paddingTop: 10 }}>{i + 1}.</span>
+                <input value={q.question} onChange={e => updateQuestion(q.id, { question: e.target.value })}
+                  placeholder="Digite a pergunta..." style={{ ...inputStyle, flex: 1 }} />
+                {questions.length > 1 && (
+                  <button onClick={() => removeQuestion(q.id)} style={{ background: "none", border: "none", color: DANGER, cursor: "pointer", padding: 6 }}>
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
+              <select value={q.type} onChange={e => setQuestionType(q.id, e.target.value)}
+                style={{ ...inputStyle, cursor: "pointer", marginBottom: (q.type === "single" || q.type === "multiple") ? 8 : 0 }}>
+                {SURVEY_QUESTION_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+              {(q.type === "single" || q.type === "multiple") && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, marginLeft: 20, marginTop: 8 }}>
+                  {(q.options || []).map((opt, idx) => (
+                    <div key={idx} style={{ display: "flex", gap: 6 }}>
+                      <input value={opt} onChange={e => updateOption(q.id, idx, e.target.value)} placeholder={`Opção ${idx + 1}`}
+                        style={{ ...inputStyle, flex: 1, padding: "7px 10px" }} />
+                      {(q.options || []).length > 2 && (
+                        <button onClick={() => removeOption(q.id, idx)} style={{ background: "none", border: "none", color: MUTED, cursor: "pointer" }}>
+                          <X size={14} />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button onClick={() => addOption(q.id)}
+                    style={{ display: "flex", alignItems: "center", gap: 4, background: "none", border: "none", color: N, cursor: "pointer", fontSize: 12, fontWeight: 600, padding: "4px 0", width: "fit-content" }}>
+                    <Plus size={12} /> Adicionar opção
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {error && <div style={{ fontSize: 12, color: DANGER }}>{error}</div>}
+
+      <div style={{ fontSize: 11, color: MUTED }}>A pesquisa é salva como rascunho. Você escolhe para quem enviar no passo seguinte.</div>
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <Btn onClick={handleSave} icon={Save} style={{ flex: 1, justifyContent: "center" }}>Salvar Pesquisa</Btn>
+        <Btn variant="secondary" onClick={onCancel} style={{ justifyContent: "center", padding: "12px 16px" }}>Cancelar</Btn>
+      </div>
+    </div>
+  );
+}
+
+function SendSurveyModal({ survey, students, onSend, onCancel }: { survey: Survey; students: User[]; onSend: (opts: { sendToAll: boolean; recipientIds: number[] }) => void; onCancel: () => void }) {
+  const [sendToAll,    setSendToAll]    = useState(true);
+  const [recipientIds, setRecipientIds] = useState<number[]>([]);
+  const [error,        setError]        = useState("");
+
+  function toggleRecipient(id: number) {
+    setRecipientIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  }
+
+  function handleSend() {
+    if (!sendToAll && recipientIds.length === 0) { setError('Selecione ao menos um aluno, ou marque "Todos os alunos".'); return; }
+    onSend({ sendToAll, recipientIds });
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      <div style={{ fontSize: 13, color: MUTED2 }}>
+        Enviando <strong style={{ color: "#f0f0f0" }}>"{survey.title}"</strong> ({survey.questions.length} pergunta(s)).
+      </div>
+      <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", gap: 4, background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 10, padding: 4, width: "fit-content" }}>
+            <button onClick={() => setSendToAll(true)} className={`tab-btn${sendToAll ? " active" : ""}`}>Todos os alunos</button>
+            <button onClick={() => setSendToAll(false)} className={`tab-btn${!sendToAll ? " active" : ""}`}>Selecionar alunos</button>
+          </div>
+          {!sendToAll && recipientIds.length > 0 && (
+            <span style={{ fontSize: 11, color: N, fontWeight: 700 }}>{recipientIds.length} selecionado(s)</span>
+          )}
+        </div>
+        {!sendToAll && (
+          <div style={{ maxHeight: 260, overflowY: "auto", paddingRight: 2 }}>
+            {students.map(s => {
+              const isSelected = recipientIds.includes(s.id);
+              return (
+                <div key={s.id} className={`student-row${isSelected ? " selected" : ""}`}
+                  onClick={() => toggleRecipient(s.id)}
+                  role="button" tabIndex={0} aria-pressed={isSelected}
+                  onKeyDown={e => e.key === "Enter" && toggleRecipient(s.id)}>
+                  <Avatar initials={s.avatar} size={34} color={isSelected ? N : MUTED} />
+                  <div style={{ flex: 1, marginLeft: 12, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{s.name}</div>
+                    <div style={{ fontSize: 11, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.email}</div>
+                  </div>
+                  <div style={{
+                    width: 20, height: 20, borderRadius: 6, flexShrink: 0,
+                    border: `1.5px solid ${isSelected ? N : BORDER2}`, background: isSelected ? N : "transparent",
+                    display: "flex", alignItems: "center", justifyContent: "center", transition: "all .15s",
+                  }}>
+                    {isSelected && <Check size={13} strokeWidth={3} style={{ color: "#000" }} />}
+                  </div>
+                </div>
+              );
+            })}
+            {students.length === 0 && <div style={{ fontSize: 12, color: MUTED, textAlign: "center", padding: 16 }}>Nenhum aluno cadastrado</div>}
+          </div>
+        )}
+      </div>
+
+      {error && <div style={{ fontSize: 12, color: DANGER }}>{error}</div>}
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <Btn onClick={handleSend} icon={Send} style={{ flex: 1, justifyContent: "center" }}>Enviar Pesquisa</Btn>
+        <Btn variant="secondary" onClick={onCancel} style={{ justifyContent: "center", padding: "12px 16px" }}>Cancelar</Btn>
+      </div>
+    </div>
+  );
+}
+
+function SurveyResults({ survey, responses, students }: { survey: Survey; responses: SurveyResponse[]; students: User[] }) {
+  const totalRecipients = survey.sendToAll ? students.length : survey.recipientIds.length;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+      <div style={{ fontSize: 12, color: MUTED }}>{responses.length} de {totalRecipients} aluno(s) responderam</div>
+      {survey.questions.map((q, qi) => {
+        const answered = responses
+          .map(r => ({ resp: r, answer: r.answers.find(a => a.questionId === q.id) }))
+          .filter(x => x.answer);
+        return (
+          <div key={q.id} className="card" style={{ padding: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>{qi + 1}. {q.question}</div>
+
+            {q.type === "text" && (
+              answered.length === 0 ? <div style={{ fontSize: 12, color: MUTED }}>Nenhuma resposta ainda</div> : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {answered.map(({ resp, answer }, i) => {
+                    const student = students.find(s => s.id === resp.studentId);
+                    return (
+                      <div key={i} style={{ padding: "8px 10px", background: CARD_BG2, borderRadius: 8 }}>
+                        <div style={{ fontSize: 11, color: MUTED, fontWeight: 700, marginBottom: 3 }}>{student?.name || "Aluno"}</div>
+                        <div style={{ fontSize: 13 }}>{String(answer?.value ?? "")}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            )}
+
+            {(q.type === "single" || q.type === "multiple") && (() => {
+              const counts: Record<string, number> = {};
+              (q.options || []).forEach(o => { counts[o] = 0; });
+              answered.forEach(({ answer }) => {
+                const vals = Array.isArray(answer?.value) ? answer.value : [answer?.value];
+                vals.forEach(v => { if (v) counts[v as string] = (counts[v as string] || 0) + 1; });
+              });
+              const max = Math.max(1, ...Object.values(counts));
+              return (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {(q.options || []).map(o => (
+                    <div key={o}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 3 }}>
+                        <span>{o}</span>
+                        <span style={{ color: MUTED }}>{counts[o] || 0}</span>
+                      </div>
+                      <ProgressBar value={counts[o] || 0} max={max} color={N} />
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {q.type === "scale" && (
+              answered.length === 0 ? <div style={{ fontSize: 12, color: MUTED }}>Nenhuma resposta ainda</div> : (() => {
+                const values = answered.map(({ answer }) => Number(answer?.value)).filter(v => !isNaN(v));
+                const avg = values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(1) : "-";
+                return (
+                  <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                    <div>
+                      <div className="display" style={{ fontSize: 26, fontWeight: 800, color: N }}>{avg}</div>
+                      <div style={{ fontSize: 11, color: MUTED }}>média de {values.length} resposta(s)</div>
+                    </div>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                      {values.map((v, i) => (
+                        <span key={i} style={{ padding: "3px 8px", background: `${N}15`, color: N, borderRadius: 8, fontSize: 11, fontWeight: 700 }}>{v}</span>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -3269,20 +3681,41 @@ function TabAuditoria({ auditLogs, onAuditLogsChange, toast, confirm }) {
 }
 
 // ─── TAB: CONFIGURAÇÕES ───────────────────────────────────────────────────
-function TabConfiguracoes({ config, onConfigChange, auditLogs, onAuditLogsChange, toast, confirm, addAuditLog }) {
+function TabConfiguracoes({ config, onConfigChange, auditLogs, onAuditLogsChange, toast, confirm, addAuditLog, workoutGuidelines, updateWorkoutGuidelines }) {
   const [section, setSection] = useState("geral");
+  const [guidelinesDraft, setGuidelinesDraft] = useState(workoutGuidelines || "");
+  useEffect(() => { setGuidelinesDraft(workoutGuidelines || ""); }, [workoutGuidelines]);
   function update(key, val) { onConfigChange({ ...config, [key]: val }); }
   function saveConfig() { toast("Configurações salvas!"); addAuditLog("Configurações do sistema atualizadas", "Sistema"); }
+  function saveGuidelines() { updateWorkoutGuidelines(guidelinesDraft); toast("Orientações de treino salvas!"); }
   const inputStyle = { background: CARD_BG2, border: `1px solid ${BORDER}`, color: "#f0f0f0", borderRadius: 8, padding: "8px 12px", fontSize: 13, outline: "none" };
   return (
     <div>
       <div style={{ display: "flex", gap: 4, background: CARD_BG, border: `1px solid ${BORDER}`, borderRadius: 12, padding: 4, width: "fit-content", marginBottom: 20, overflowX: "auto" }}>
-        {[{ id: "geral", label: "Geral", icon: Sliders }, { id: "notificacoes", label: "Notificações", icon: Bell }, { id: "seguranca", label: "Segurança", icon: Shield }].map(s => (
+        {[{ id: "geral", label: "Geral", icon: Sliders }, { id: "treino", label: "Treino", icon: Dumbbell }, { id: "notificacoes", label: "Notificações", icon: Bell }, { id: "seguranca", label: "Segurança", icon: Shield }].map(s => (
           <button key={s.id} onClick={() => setSection(s.id)} className={`tab-btn${section === s.id ? " active" : ""}`} style={{ display: "flex", alignItems: "center", gap: 5 }}>
             <s.icon size={13} /> {s.label}
           </button>
         ))}
       </div>
+      {section === "treino" && (
+        <div className="card">
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>Orientações do treino</div>
+          <div style={{ fontSize: 12, color: MUTED, marginBottom: 14 }}>
+            Texto padrão exibido para todos os alunos na aba Treino. Use uma linha por orientação (comece com "•" para marcar como item de lista).
+          </div>
+          <textarea
+            rows={12}
+            value={guidelinesDraft}
+            onChange={e => setGuidelinesDraft(e.target.value)}
+            placeholder="Ex: Em todas as séries de trabalho, você irá executar até a falha!"
+            style={{ ...inputStyle, width: "100%", resize: "vertical", lineHeight: 1.6, fontFamily: "inherit" }}
+          />
+          <div style={{ marginTop: 14 }}>
+            <Btn onClick={saveGuidelines} icon={Save} style={{ width: "100%", justifyContent: "center" }}>Salvar Orientações</Btn>
+          </div>
+        </div>
+      )}
       {section === "geral" && (
         <div>
           <div className="card" style={{ marginBottom: 14 }}>
@@ -3355,14 +3788,18 @@ export function AdminDashboard({ user, onLogout, onViewAsStudent }) {
     // ── NOVO ──
     exerciseLibrary,
     workoutTemplates,
+    workoutGuidelines,
+    surveys,
+    surveyResponses,
     onUsersChange, onStudentsDataChange,
     onNotificationsChange, onAuditLogsChange, onPermissionsChange, onConfigChange,
-    updateStudentWorkouts, updateCoachNote,
+    updateStudentWorkouts, updateCoachNote, updateWorkoutGuidelines,
     adminApprovePhoto, adminRequestResubmit,
     addAuditLog,
     // ── NOVO ──
     addExerciseTemplate, updateExerciseTemplate, deleteExerciseTemplate,
     addWorkoutTemplate, updateWorkoutTemplate, deleteWorkoutTemplate,
+    addSurvey, sendSurvey, deleteSurvey,
   } = useAdminProps();
 
   useEffect(() => {
@@ -3549,7 +3986,10 @@ export function AdminDashboard({ user, onLogout, onViewAsStudent }) {
                   onApprove={adminApprovePhoto} onRequestResubmit={adminRequestResubmit} />
               )}
 
-              {tab === "relatorios" && <TabRelatorios users={users} studentsData={studentsData} toast={toast}  />}
+              {tab === "relatorios" && (
+                <TabRelatorios users={users} studentsData={studentsData} toast={toast} confirm={confirm}
+                  surveys={surveys} surveyResponses={surveyResponses} addSurvey={addSurvey} sendSurvey={sendSurvey} deleteSurvey={deleteSurvey} />
+              )}
 
               {tab === "notificacoes" && <TabNotificacoes notifications={notifications} onNotificationsChange={onNotificationsChange} toast={toast} />}
 
@@ -3560,7 +4000,8 @@ export function AdminDashboard({ user, onLogout, onViewAsStudent }) {
               {tab === "configuracoes" && (
                 <TabConfiguracoes config={config} onConfigChange={onConfigChange}
                   auditLogs={auditLogs} onAuditLogsChange={onAuditLogsChange}
-                  toast={toast} confirm={confirm} addAuditLog={addAuditLog} />
+                  toast={toast} confirm={confirm} addAuditLog={addAuditLog}
+                  workoutGuidelines={workoutGuidelines} updateWorkoutGuidelines={updateWorkoutGuidelines} />
               )}
 
             </motion.div>

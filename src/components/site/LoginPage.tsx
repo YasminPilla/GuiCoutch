@@ -272,7 +272,7 @@ export function LoginPage({ onLogin, onBackToHome }: LoginPageProps) {
             {/* Logo */}
             <div className="lp-logo">
               <img
-                src="/logo.png"
+                src="/logo_red_512.png"
                 alt="GC Logo"
                 style={{
                   width: 55,

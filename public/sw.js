@@ -1,9 +1,9 @@
-const CACHE_NAME = "gc-shell-v1";
+const CACHE_NAME = "gc-shell-v2";
 const APP_SHELL = [
   "/",
   "/site.webmanifest",
-  "/favicon.ico",
-  "/logo.png",
+  "/favicon_1.ico",
+  "/logo_red_512.png",
 ];
 
 self.addEventListener("install", (event) => {

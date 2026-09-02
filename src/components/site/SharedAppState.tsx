@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from "framer-motion";
 // ─── Firebase ─────────────────────────────────────────────────────────────
 import { db } from "@/components/site/firebase";
 import {
-  collection, doc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot,
+  collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot,
   writeBatch, query, orderBy, limit,
 } from "firebase/firestore";
 
@@ -136,6 +136,41 @@ export interface WorkoutTemplate {
 export const WORKOUT_CATEGORIES = [
   "Superior", "Inferior", "Full Body", "Push", "Pull", "Força", "Outro",
 ];
+
+// ── NOVO: Pesquisas (surveys) ─────────────────────────────────────────────
+export type SurveyQuestionType = "text" | "single" | "multiple" | "scale";
+
+export interface SurveyQuestion {
+  id: string;
+  type: SurveyQuestionType;
+  question: string;
+  options?: string[]; // usado em "single" e "multiple"
+}
+
+export interface Survey {
+  id: string;
+  title: string;
+  description: string;
+  questions: SurveyQuestion[];
+  status: "draft" | "sent";
+  sendToAll: boolean;
+  recipientIds: number[]; // ignorado quando sendToAll é true
+  createdAt: string;
+  sentAt?: string;
+}
+
+export interface SurveyAnswer {
+  questionId: string;
+  value: string | string[];
+}
+
+export interface SurveyResponse {
+  id: string; // `${surveyId}_${studentId}`
+  surveyId: string;
+  studentId: number;
+  answers: SurveyAnswer[];
+  submittedAt: string;
+}
 
 export interface SharedState {
   users: User[];
@@ -374,6 +409,12 @@ const INITIAL_SYSTEM_CONFIG = {
   timezone: "America/Sao_Paulo", language: "pt-BR",
 };
 
+// ── Orientações do treino: texto padrão exibido para TODOS os alunos ─────
+export const DEFAULT_WORKOUT_GUIDELINES =
+`• Em todas as séries de trabalho, você irá executar até a falha!
+• Fique atento(a) às orientações das técnicas; será especificado em qual série elas devem ser aplicadas. Quando for indicado para utilizar na última série de trabalho, será sempre nessa última, mesmo se se trate de uma back off set! É nessa série que você irá aplicar!
+• Todo o sistema de treino que estou te entregando é baseado em dois pilares: progressão e recuperação entre os treinos. Nunca se esqueça: para promover uma nova adaptação (e alcançar a hipertrofia), é essencial fornecer um estímulo diferente. Toda a estratégia que estou desenvolvendo para você considera exatamente isso.`;
+
 // ─── CONTEXT ──────────────────────────────────────────────────────────────
 
 interface AppContextValue {
@@ -387,6 +428,9 @@ interface AppContextValue {
   // ── NOVO ──
   exerciseLibrary: ExerciseTemplate[];
   workoutTemplates: WorkoutTemplate[];
+  workoutGuidelines: string;
+  surveys: Survey[];
+  surveyResponses: SurveyResponse[];
 
   setUsers: (users: User[]) => void;
   setStudentsData: (data: Record<number, StudentData>) => void;
@@ -397,6 +441,7 @@ interface AppContextValue {
 
   updateStudentWorkouts: (studentId: number, workouts: Workout[]) => void;
   updateCoachNote: (studentId: number, note: string) => void;
+  updateWorkoutGuidelines: (text: string) => void;
   sendMessageToStudent: (studentId: number, text: string) => void;
   sendMessageToCoach: (studentId: number, text: string) => void;
   studentSubmitPhoto: (studentId: number, photo: Omit<ProgressPhoto, "pendingReview" | "rejectedByCoach">) => void;
@@ -414,6 +459,11 @@ interface AppContextValue {
   addWorkoutTemplate:    (t: WorkoutTemplate) => Promise<void>;
   updateWorkoutTemplate: (t: WorkoutTemplate) => Promise<void>;
   deleteWorkoutTemplate: (id: string)         => Promise<void>;
+  // ── NOVO: Pesquisas ──
+  addSurvey:              (s: Survey) => Promise<void>;
+  sendSurvey:             (id: string, opts: { sendToAll: boolean; recipientIds: number[] }) => Promise<void>;
+  deleteSurvey:           (id: string) => Promise<void>;
+  submitSurveyResponse:   (surveyId: string, studentId: number, answers: SurveyAnswer[]) => Promise<void>;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
@@ -467,6 +517,9 @@ export function SharedAppProvider({ children }: { children: React.ReactNode }) {
   // ── NOVO ──
   const [exerciseLibrary,  setExerciseLibraryLocal] = useState<ExerciseTemplate[]>([]);
   const [workoutTemplates, setWorkoutTemplatesLocal] = useState<WorkoutTemplate[]>([]);
+  const [workoutGuidelines, setWorkoutGuidelinesLocal] = useState<string>(DEFAULT_WORKOUT_GUIDELINES);
+  const [surveys,          setSurveysLocal]          = useState<Survey[]>([]);
+  const [surveyResponses,  setSurveyResponsesLocal]  = useState<SurveyResponse[]>([]);
 
   const usersRef = useRef<User[]>([]);
   useEffect(() => { usersRef.current = users; }, [users]);
@@ -504,6 +557,12 @@ export function SharedAppProvider({ children }: { children: React.ReactNode }) {
             libBatch.set(doc(db, "exerciseLibrary", t.id), t)
           );
           await libBatch.commit();
+        }
+
+        // ── NOVO: seed das orientações gerais de treino ──────────────────
+        const guidelinesSnap = await getDoc(doc(db, "settings", "global"));
+        if (!guidelinesSnap.exists()) {
+          await setDoc(doc(db, "settings", "global"), { workoutGuidelines: DEFAULT_WORKOUT_GUIDELINES });
         }
 
       } catch (e) {
@@ -562,6 +621,29 @@ export function SharedAppProvider({ children }: { children: React.ReactNode }) {
               .map(d => d.data() as WorkoutTemplate)
               .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"))
           );
+        })
+      );
+
+      // ── NOVO: Assinatura em tempo real — orientações gerais de treino ──
+      unsubs.push(
+        onSnapshot(doc(db, "settings", "global"), snap => {
+          setWorkoutGuidelinesLocal(snap.data()?.workoutGuidelines ?? DEFAULT_WORKOUT_GUIDELINES);
+        })
+      );
+
+      // ── NOVO: Assinatura em tempo real — pesquisas ──────────────────────
+      unsubs.push(
+        onSnapshot(collection(db, "surveys"), snap => {
+          setSurveysLocal(
+            snap.docs
+              .map(d => d.data() as Survey)
+              .sort((a, b) => (b.createdAt || "").localeCompare(a.createdAt || ""))
+          );
+        })
+      );
+      unsubs.push(
+        onSnapshot(collection(db, "surveyResponses"), snap => {
+          setSurveyResponsesLocal(snap.docs.map(d => d.data() as SurveyResponse));
         })
       );
     };
@@ -691,6 +773,49 @@ export function SharedAppProvider({ children }: { children: React.ReactNode }) {
     await addAuditLog(`Nota do coach atualizada para ${student?.name}`, "Nota do Coach");
   }, [users, addAuditLog]);
 
+  // ── Orientações gerais de treino (exibidas para todos os alunos) ──────────
+
+  const updateWorkoutGuidelines = useCallback(async (text: string) => {
+    setWorkoutGuidelinesLocal(text);
+    await setDoc(doc(db, "settings", "global"), { workoutGuidelines: text }, { merge: true });
+    await addAuditLog("Orientações gerais de treino atualizadas", "Configurações");
+  }, [addAuditLog]);
+
+  // ── Pesquisas ────────────────────────────────────────────────────────────
+
+  const addSurvey = useCallback(async (s: Survey) => {
+    await setDoc(doc(db, "surveys", s.id), s);
+    await addAuditLog(`Pesquisa "${s.title}" criada como rascunho`, "Pesquisas");
+  }, [addAuditLog]);
+
+  const sendSurvey = useCallback(async (id: string, opts: { sendToAll: boolean; recipientIds: number[] }) => {
+    await setDoc(doc(db, "surveys", id), {
+      sendToAll: opts.sendToAll,
+      recipientIds: opts.sendToAll ? [] : opts.recipientIds,
+      status: "sent",
+      sentAt: new Date().toISOString(),
+    }, { merge: true });
+    const s = surveys.find(sv => sv.id === id);
+    const count = opts.sendToAll ? "todos os alunos" : `${opts.recipientIds.length} aluno(s)`;
+    await addAuditLog(`Pesquisa "${s?.title}" enviada para ${count}`, "Pesquisas", "success");
+    await addNotification(`Nova pesquisa "${s?.title}" enviada para ${count}`, "survey");
+  }, [surveys, addAuditLog, addNotification]);
+
+  const deleteSurvey = useCallback(async (id: string) => {
+    const s = surveys.find(sv => sv.id === id);
+    await deleteDoc(doc(db, "surveys", id));
+    await addAuditLog(`Pesquisa "${s?.title}" removida`, "Pesquisas", "warning");
+  }, [surveys, addAuditLog]);
+
+  const submitSurveyResponse = useCallback(async (surveyId: string, studentId: number, answers: SurveyAnswer[]) => {
+    const id = `${surveyId}_${studentId}`;
+    const entry: SurveyResponse = { id, surveyId, studentId, answers, submittedAt: new Date().toISOString() };
+    await setDoc(doc(db, "surveyResponses", id), entry);
+    const student = users.find(u => u.id === studentId);
+    const survey  = surveys.find(sv => sv.id === surveyId);
+    await addNotification(`${student?.name} respondeu a pesquisa "${survey?.title || ""}"`, "survey_response");
+  }, [users, surveys, addNotification]);
+
   // ── Mensagens ─────────────────────────────────────────────────────────────
 
   const sendMessageToStudent = useCallback(async (studentId: number, text: string) => {
@@ -807,9 +932,13 @@ export function SharedAppProvider({ children }: { children: React.ReactNode }) {
     users, studentsData, notifications, auditLogs, permissions, config, loading,
     exerciseLibrary,            // ── NOVO ──
     workoutTemplates,           // ── NOVO ──
+    workoutGuidelines,          // ── NOVO ──
+    surveys,                    // ── NOVO ──
+    surveyResponses,            // ── NOVO ──
     setUsers, setStudentsData,
     setNotifications, setAuditLogs, setPermissions, setConfig,
-    updateStudentWorkouts, updateCoachNote,
+    updateStudentWorkouts, updateCoachNote, updateWorkoutGuidelines,
+    addSurvey, sendSurvey, deleteSurvey, submitSurveyResponse,    // ── NOVO ──
     sendMessageToStudent, sendMessageToCoach,
     studentSubmitPhoto, adminApprovePhoto, adminRequestResubmit, studentResubmitPhoto,
     addWorkoutSession,
@@ -830,7 +959,7 @@ export function SharedAppProvider({ children }: { children: React.ReactNode }) {
       display: "flex", alignItems: "center", justifyContent: "center",
     }}>
       <img
-        src="/logo.png"
+        src="/logo_red_512.png"
         alt="GC Fitness"
         style={{
           width: 200, height: 200, objectFit: "contain",
@@ -865,6 +994,9 @@ export function useAdminProps() {
     pendingPhotosCount:     ctx.pendingPhotosCount,
     exerciseLibrary:        ctx.exerciseLibrary,        // ── NOVO ──
     workoutTemplates:       ctx.workoutTemplates,       // ── NOVO ──
+    workoutGuidelines:      ctx.workoutGuidelines,      // ── NOVO ──
+    surveys:                ctx.surveys,                // ── NOVO ──
+    surveyResponses:        ctx.surveyResponses,        // ── NOVO ──
     onUsersChange:          ctx.setUsers,
     onStudentsDataChange:   ctx.setStudentsData,
     onNotificationsChange:  ctx.setNotifications,
@@ -873,6 +1005,7 @@ export function useAdminProps() {
     onConfigChange:         ctx.setConfig,
     updateStudentWorkouts:  ctx.updateStudentWorkouts,
     updateCoachNote:        ctx.updateCoachNote,
+    updateWorkoutGuidelines: ctx.updateWorkoutGuidelines, // ── NOVO ──
     sendMessageToStudent:   ctx.sendMessageToStudent,
     adminApprovePhoto:      ctx.adminApprovePhoto,
     adminRequestResubmit:   ctx.adminRequestResubmit,
@@ -882,6 +1015,9 @@ export function useAdminProps() {
     addWorkoutTemplate:     ctx.addWorkoutTemplate,     // ── NOVO ──
     updateWorkoutTemplate:  ctx.updateWorkoutTemplate,  // ── NOVO ──
     deleteWorkoutTemplate:  ctx.deleteWorkoutTemplate,  // ── NOVO ──
+    addSurvey:              ctx.addSurvey,              // ── NOVO ──
+    sendSurvey:             ctx.sendSurvey,             // ── NOVO ──
+    deleteSurvey:           ctx.deleteSurvey,           // ── NOVO ──
   };
 }
 
@@ -891,10 +1027,15 @@ export function useStudentProps(studentId: number) {
   return {
     sharedStudentData:   sd,
     exerciseLibrary:     ctx.exerciseLibrary,           // ── NOVO: aluno pode ver a biblioteca ──
+    workoutGuidelines:   ctx.workoutGuidelines,         // ── NOVO: orientações gerais de treino ──
+    // ── NOVO: pesquisas destinadas a este aluno + respostas já enviadas ──
+    mySurveys:           ctx.surveys.filter(s => s.status === "sent" && (s.sendToAll || s.recipientIds.includes(studentId))),
+    mySurveyResponses:   ctx.surveyResponses.filter(r => r.studentId === studentId),
     onSendMessage:       (text: string)                                                            => ctx.sendMessageToCoach(studentId, text),
     onSubmitPhoto:       (photo: Omit<ProgressPhoto, "pendingReview" | "rejectedByCoach">)         => ctx.studentSubmitPhoto(studentId, photo),
     onResubmitPhoto:     (photoId: string, newUrl: string)                                         => ctx.studentResubmitPhoto(studentId, photoId, newUrl),
     onAddWorkoutSession: (session: WorkoutSession)                                                  => ctx.addWorkoutSession(studentId, session),
+    onSubmitSurveyResponse: (surveyId: string, answers: SurveyAnswer[])                             => ctx.submitSurveyResponse(surveyId, studentId, answers),
   };
 }
 

@@ -27,7 +27,7 @@ import {
   Play, FileText, Download, Share2, Sun,
   ChevronDown, ChevronRight, Upload, Camera, ZoomIn, RefreshCw,
   Globe, Palette, LayoutGrid, Vibrate, Eye as EyeIcon, Contrast,
-  SlidersHorizontal, RotateCcw, Check as CheckIcon,
+  SlidersHorizontal, RotateCcw, Check as CheckIcon, Info, ClipboardList,
 } from "lucide-react";
 
 import {
@@ -462,8 +462,41 @@ function EditableDropdown({ value, onChange, options, isDark, accent, placeholde
   );
 }
 
+// ─── Orientações gerais de treino (texto padrão definido pelo admin) ──────
+function WorkoutGuidelinesCard({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const lines = (text || "").split("\n").map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+  return (
+    <div className="card" style={{ marginBottom: 20, borderColor: `${YELLOW}33`, background: `${YELLOW}0A` }}>
+      <button onClick={() => setExpanded(e => !e)}
+        style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", background: "none", border: "none", padding: 0, cursor: "pointer", color: "inherit", fontFamily: "inherit" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <Info size={16} style={{ color: YELLOW }} />
+          <span style={{ fontSize: "0.93em", fontWeight: 700, color: YELLOW }}>Orientações do treino</span>
+        </div>
+        <ChevronDown size={16} style={{ color: "var(--muted)", transform: expanded ? "rotate(180deg)" : "rotate(0)", transition: "transform .2s", flexShrink: 0 }} />
+      </button>
+      {expanded && (
+        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+          {lines.map((line, i) => {
+            const isBullet = line.startsWith("•") || line.startsWith("-");
+            const content = isBullet ? line.replace(/^[•-]\s*/, "") : line;
+            return (
+              <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                {isBullet && <span style={{ color: YELLOW, lineHeight: 1.6 }}>•</span>}
+                <p style={{ fontSize: "0.93em", lineHeight: 1.6, margin: 0 }}>{content}</p>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── TAB: TREINOS ─────────────────────────────────────────────────────────
-function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent, extraSessions = [], inProgressWorkout = null }: any) {
+function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent, extraSessions = [], inProgressWorkout = null, workoutGuidelines = "" }: any) {
   const [expandedWorkout, setExpandedWorkout] = useState<number | null>(null);
   const workouts = sd?.workouts || [];
 
@@ -514,6 +547,7 @@ function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent, extraSessio
           <h2 className="display" style={{ fontSize: "clamp(1.43em,6vw,1.86em)", fontWeight: 800 }}>Meus Treinos</h2>
           <p style={{ fontSize: "0.93em", color: "var(--muted)", marginTop: 4 }}>Aguardando seu coach configurar os treinos</p>
         </div>
+        <WorkoutGuidelinesCard text={workoutGuidelines} />
         <div className="card" style={{ textAlign: "center", padding: 60 }}>
           <Dumbbell size={48} style={{ color: "var(--muted)", marginBottom: 16 }} />
           <div style={{ fontSize: "1.14em", fontWeight: 600, marginBottom: 8 }}>Nenhum treino ainda</div>
@@ -529,6 +563,8 @@ function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent, extraSessio
         <h2 className="display" style={{ fontSize: "clamp(1.43em,6vw,1.86em)", fontWeight: 800 }}>Meus Treinos</h2>
         <p style={{ fontSize: "0.93em", color: "var(--muted)", marginTop: 4 }}>Semana atual · {workouts.length} treinos programados</p>
       </div>
+
+      <WorkoutGuidelinesCard text={workoutGuidelines} />
 
       {sd?.coachNote && (
         <div className="card" style={{ marginBottom: 20, background: `${accent || N}08`, borderColor: `${accent || N}22` }}>
@@ -1540,6 +1576,190 @@ function AdaptiveWorkoutModal({ workout, onClose, onStart, accent }: any) {
   );
 }
 
+// ─── TAB: PESQUISAS ───────────────────────────────────────────────────────
+function SurveysTab({ mySurveys, mySurveyResponses, onSubmitSurveyResponse, accent }: any) {
+  const [activeSurvey, setActiveSurvey] = useState<any>(null);
+  const color = accent || N;
+  const respondedIds = new Set(mySurveyResponses.map((r: any) => r.surveyId));
+  const pending  = mySurveys.filter((s: any) => !respondedIds.has(s.id));
+  const answered = mySurveys.filter((s: any) => respondedIds.has(s.id));
+
+  function handleSubmit(answers: any) {
+    onSubmitSurveyResponse(activeSurvey.id, answers);
+    setActiveSurvey(null);
+  }
+
+  return (
+    <motion.div key="pesquisas" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+      <div style={{ marginBottom: 24 }}>
+        <h2 className="display" style={{ fontSize: "clamp(1.43em,6vw,1.86em)", fontWeight: 800 }}>Pesquisas</h2>
+        <p style={{ fontSize: "0.93em", color: "var(--muted)", marginTop: 4 }}>
+          {pending.length > 0 ? `${pending.length} pesquisa(s) aguardando resposta` : "Você está em dia com as pesquisas"}
+        </p>
+      </div>
+
+      {mySurveys.length === 0 && (
+        <div className="card" style={{ textAlign: "center", padding: 60 }}>
+          <ClipboardList size={48} style={{ color: "var(--muted)", marginBottom: 16 }} />
+          <div style={{ fontSize: "1.14em", fontWeight: 600, marginBottom: 8 }}>Nenhuma pesquisa por aqui</div>
+          <div style={{ fontSize: "0.93em", color: "var(--muted)" }}>Seu coach ainda não enviou nenhuma pesquisa.</div>
+        </div>
+      )}
+
+      {pending.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: answered.length ? 24 : 0 }}>
+          {pending.map((s: any) => (
+            <div key={s.id} className="card" style={{ borderLeft: `3px solid ${YELLOW}`, cursor: "pointer" }} onClick={() => setActiveSurvey(s)}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+                <div>
+                  <div style={{ fontSize: "1.07em", fontWeight: 700 }}>{s.title}</div>
+                  {s.description && <div style={{ fontSize: "0.86em", color: "var(--muted)", marginTop: 4 }}>{s.description}</div>}
+                  <div style={{ fontSize: "0.79em", color: "var(--muted)", marginTop: 6 }}>{s.questions.length} pergunta(s)</div>
+                </div>
+                <NeonBtn accent={color} small>Responder</NeonBtn>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {answered.length > 0 && (
+        <div>
+          <div style={{ fontSize: "0.79em", fontWeight: 700, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: 10 }}>Respondidas</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {answered.map((s: any) => (
+              <div key={s.id} className="card" style={{ opacity: 0.7, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+                <div style={{ fontSize: "0.93em", fontWeight: 600 }}>{s.title}</div>
+                <CheckCircle2 size={16} style={{ color }} />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <AnimatePresence>
+        {activeSurvey && (
+          <SurveyResponseModal survey={activeSurvey} accent={color} onClose={() => setActiveSurvey(null)} onSubmit={handleSubmit} />
+        )}
+      </AnimatePresence>
+    </motion.div>
+  );
+}
+
+function SurveyResponseModal({ survey, accent, onClose, onSubmit }: any) {
+  const color = accent || N;
+  const [answers, setAnswers] = useState<Record<string, any>>({});
+  const [error, setError] = useState("");
+
+  function setAnswer(qid: string, value: any) {
+    setAnswers(prev => ({ ...prev, [qid]: value }));
+    setError("");
+  }
+  function toggleMultiple(qid: string, opt: string) {
+    setAnswers(prev => {
+      const current: string[] = prev[qid] || [];
+      const next = current.includes(opt) ? current.filter(o => o !== opt) : [...current, opt];
+      return { ...prev, [qid]: next };
+    });
+    setError("");
+  }
+
+  function handleSubmit() {
+    for (const q of survey.questions) {
+      const v = answers[q.id];
+      if (q.type === "text" && !(v || "").trim())            { setError("Responda todas as perguntas antes de enviar."); return; }
+      if (q.type === "single" && !v)                          { setError("Responda todas as perguntas antes de enviar."); return; }
+      if (q.type === "multiple" && (!v || v.length === 0))    { setError("Responda todas as perguntas antes de enviar."); return; }
+      if (q.type === "scale" && v === undefined)              { setError("Responda todas as perguntas antes de enviar."); return; }
+    }
+    const formatted = survey.questions.map((q: any) => ({
+      questionId: q.id,
+      value: q.type === "scale" ? String(answers[q.id]) : answers[q.id],
+    }));
+    onSubmit(formatted);
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 1000, padding: 16, backdropFilter: "blur(3px)" }}
+      onClick={onClose}>
+      <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
+        className="card" style={{ maxWidth: 600, maxHeight: "85vh", overflowY: "auto", width: "100%", borderRadius: "20px 20px 0 0" }}
+        onClick={(e: any) => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <h3 className="display" style={{ fontSize: "1.29em", fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+            <ClipboardList size={20} style={{ color }} /> {survey.title}
+          </h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+        {survey.description && <div style={{ fontSize: "0.93em", color: "var(--muted)", marginBottom: 20 }}>{survey.description}</div>}
+
+        <div style={{ display: "flex", flexDirection: "column", gap: 18, marginBottom: 20 }}>
+          {survey.questions.map((q: any, i: number) => (
+            <div key={q.id}>
+              <div style={{ fontSize: "0.93em", fontWeight: 600, marginBottom: 10 }}>{i + 1}. {q.question}</div>
+
+              {q.type === "text" && (
+                <textarea rows={3} value={answers[q.id] || ""} onChange={e => setAnswer(q.id, e.target.value)}
+                  placeholder="Digite sua resposta..."
+                  style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.1)", borderRadius: 10, padding: "10px 12px", color: "inherit", fontFamily: "inherit", fontSize: "0.93em", outline: "none", resize: "vertical" }} />
+              )}
+
+              {q.type === "single" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {(q.options || []).map((opt: string) => (
+                    <div key={opt} onClick={() => setAnswer(q.id, opt)}
+                      style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, border: `1px solid ${answers[q.id] === opt ? color : "rgba(255,255,255,0.1)"}`, background: answers[q.id] === opt ? `${color}12` : "transparent", cursor: "pointer" }}>
+                      <div style={{ width: 16, height: 16, borderRadius: "50%", border: `2px solid ${answers[q.id] === opt ? color : "var(--muted)"}`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                        {answers[q.id] === opt && <div style={{ width: 8, height: 8, borderRadius: "50%", background: color }} />}
+                      </div>
+                      <span style={{ fontSize: "0.93em" }}>{opt}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {q.type === "multiple" && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {(q.options || []).map((opt: string) => {
+                    const checked = (answers[q.id] || []).includes(opt);
+                    return (
+                      <div key={opt} onClick={() => toggleMultiple(q.id, opt)}
+                        style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10, border: `1px solid ${checked ? color : "rgba(255,255,255,0.1)"}`, background: checked ? `${color}12` : "transparent", cursor: "pointer" }}>
+                        <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${checked ? color : "var(--muted)"}`, background: checked ? color : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                          {checked && <CheckIcon size={11} style={{ color: "#000" }} />}
+                        </div>
+                        <span style={{ fontSize: "0.93em" }}>{opt}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+
+              {q.type === "scale" && (
+                <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {Array.from({ length: 10 }, (_, idx) => idx + 1).map(n => (
+                    <button key={n} onClick={() => setAnswer(q.id, n)}
+                      style={{ width: 32, height: 32, borderRadius: 8, border: `1px solid ${answers[q.id] === n ? color : "rgba(255,255,255,0.1)"}`, background: answers[q.id] === n ? color : "transparent", color: answers[q.id] === n ? "#000" : "inherit", fontWeight: 700, fontSize: "0.86em", cursor: "pointer" }}>
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {error && <div style={{ fontSize: "0.86em", color: DANGER, marginBottom: 12 }}>{error}</div>}
+
+        <NeonBtn accent={color} onClick={handleSubmit} style={{ justifyContent: "center", width: "100%" }}>
+          <Send size={16} /> Enviar Respostas
+        </NeonBtn>
+      </motion.div>
+    </motion.div>
+  );
+}
+
 // ─── WORKOUT CAROUSEL MODAL (NAVEGAÇÃO LIVRE) ─────────────────────────────
 function WorkoutCarouselModal({
   workout,
@@ -2192,10 +2412,14 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
   const {
     sharedStudentData,
     exerciseLibrary,
+    workoutGuidelines,
+    mySurveys,
+    mySurveyResponses,
     onSendMessage,
     onSubmitPhoto,
     onResubmitPhoto,
     onAddWorkoutSession,
+    onSubmitSurveyResponse,
   } = useStudentProps(user.id);
 
   const sd = sharedStudentData ?? null;
@@ -2264,11 +2488,17 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
     try { localStorage.removeItem(activeWorkoutKey); } catch {}
   }
 
+  const pendingSurveysCount = (mySurveys || []).filter(
+    (s: any) => !(mySurveyResponses || []).some((r: any) => r.surveyId === s.id)
+  ).length;
+  const [surveyBannerDismissed, setSurveyBannerDismissed] = useState(false);
+
   const tabs = [
-    { id: "treino",  label: "Treino",     icon: Dumbbell },
-    { id: "diario",  label: "Relatórios", icon: Calendar },
-    { id: "fotos",   label: "Progresso",  icon: Camera },
-    { id: "config",  label: "Config",     icon: Settings },
+    { id: "treino",    label: "Treino",     icon: Dumbbell },
+    { id: "diario",    label: "Relatórios", icon: Calendar },
+    { id: "fotos",     label: "Progresso",  icon: Camera },
+    { id: "pesquisas", label: "Pesquisas",  icon: ClipboardList, badge: pendingSurveysCount },
+    { id: "config",    label: "Config",     icon: Settings },
   ];
 
   if (sharedStudentData === undefined) {
@@ -2316,6 +2546,11 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
                 <button key={t.id} onClick={() => setTab(t.id)} className={`tab-btn ${tab === t.id ? "active" : ""}`} style={{ display: "flex", alignItems: "center", gap: 6, border: "none" }}>
                   <Icon size={15} />
                   <span>{t.label}</span>
+                  {!!t.badge && (
+                    <span style={{ minWidth: 16, height: 16, padding: "0 4px", borderRadius: 8, background: YELLOW, color: "#000", fontSize: "0.71em", fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                      {t.badge}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -2323,11 +2558,41 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
         </div>
       </div>
 
+      {/* Alerta de pesquisa pendente — aparece assim que o aluno entra no app */}
+      <AnimatePresence>
+        {pendingSurveysCount > 0 && !surveyBannerDismissed && tab !== "pesquisas" && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }}
+            style={{ overflow: "hidden", background: `${YELLOW}12`, borderBottom: `1px solid ${YELLOW}33` }}>
+            <div style={{ maxWidth: 1200, margin: "0 auto", padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <ClipboardList size={18} style={{ color: YELLOW, flexShrink: 0 }} />
+                <div>
+                  <div style={{ fontSize: "0.93em", fontWeight: 700, color: YELLOW }}>
+                    {pendingSurveysCount === 1 ? "Nova pesquisa disponível" : `${pendingSurveysCount} novas pesquisas disponíveis`}
+                  </div>
+                  <div style={{ fontSize: "0.79em", color: "var(--muted)" }}>Seu coach quer saber sua opinião — leva menos de 1 minuto.</div>
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                <button onClick={() => setTab("pesquisas")}
+                  style={{ background: YELLOW, border: "none", borderRadius: 100, padding: "8px 16px", fontWeight: 700, fontSize: "0.86em", color: "#000", cursor: "pointer" }}>
+                  Responder
+                </button>
+                <button onClick={() => setSurveyBannerDismissed(true)}
+                  style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", padding: 6, display: "flex" }}>
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Conteúdo */}
       <div className="main-content">
         <AnimatePresence mode="wait">
           {tab === "treino" && (
-            <WorkoutTab key="treino" sd={sd} accent={accent} extraSessions={localSessions}
+            <WorkoutTab key="treino" sd={sd} accent={accent} extraSessions={localSessions} workoutGuidelines={workoutGuidelines}
               inProgressWorkout={hasUnsavedWorkout && selectedWorkout ? {
                 workout: selectedWorkout,
                 doneCount: workoutDoneStatus.filter(Boolean).length,
@@ -2344,6 +2609,10 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
             <ProgressPhotosTab key="fotos" sd={sd} isDark={settings.isDark} accent={accent}
               onSubmitPhoto={onSubmitPhoto}
               onResubmitPhoto={onResubmitPhoto} />
+          )}
+          {tab === "pesquisas" && (
+            <SurveysTab key="pesquisas" mySurveys={mySurveys || []} mySurveyResponses={mySurveyResponses || []}
+              onSubmitSurveyResponse={onSubmitSurveyResponse} accent={accent} />
           )}
           {tab === "config" && (
             <SettingsTab key="config" settings={settings} onSettingsChange={setSettings} isDark={settings.isDark} accent={accent} onResetSettings={() => setSettings(DEFAULT_SETTINGS)} />
