@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 import { motion } from "framer-motion";
 import { CheckCircle2, Target } from "lucide-react";
-import profileImg from "@/assets/shape/depois-3.jpg";
+import profileImg from "@/assets/shape/foto-capa.jpeg";
 
 const credentials = [
   "Bacharelado em Educação Física — UNESP, Rio Claro",
@@ -16,7 +16,7 @@ const specialities = [
 
 const stats = [
   { value: "200+", label: "alunos" },
-  { value: "8 anos", label: "experiência" },
+  { value: "4 anos", label: "experiência" },
   { value: "94%", label: "retenção" },
 ];
 
@@ -359,7 +359,7 @@ export function About() {
                 src={profileImg}
                 alt="Guilherme Couto, personal trainer"
                 className="ab-photo-img"
-                style={{ transform: "scale(2.6)", transformOrigin: "66% 32%" }}
+                style={{ objectPosition: "50% 15%" }}
               />
               <div className="ab-photo-fade" />
               <div className="ab-photo-badge">

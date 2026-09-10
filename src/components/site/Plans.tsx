@@ -19,10 +19,9 @@ const plans = [
     items: [
       { label: "Acesso à plataforma", ok: true },
       { label: "Treino personalizado (casa ou academia)", ok: true },
-      { label: "Suporte via plataforma (respostas em 72h)", ok: true },
-      { label: "Acompanhamento semanal", ok: false },
+      { label: "Suporte via plataforma (respostas em 24h)", ok: true },
+      { label: "Acompanhamento mensal", ok: true },
       { label: "Fotos e registro de progresso", ok: false },
-      { label: "Videochamada mensal", ok: false },
     ],
   },
   {
@@ -36,9 +35,8 @@ const plans = [
       { label: "Acesso à plataforma", ok: true },
       { label: "Treino personalizado com periodização", ok: true },
       { label: "Suporte prioritário (respostas em 24h)", ok: true },
-      { label: "Acompanhamento semanal", ok: true },
+      { label: "Acompanhamento quinzenal", ok: true },
       { label: "Fotos e registro de progresso", ok: true },
-      { label: "Videochamada mensal", ok: false },
     ],
   },
   {
@@ -51,10 +49,9 @@ const plans = [
     items: [
       { label: "Acesso à plataforma", ok: true },
       { label: "Treino personalizado com periodização", ok: true },
-      { label: "Suporte VIP (respostas em 12h)", ok: true },
-      { label: "Acompanhamento quinzenal (check-in)", ok: true },
+      { label: "Suporte VIP (respostas em 24h)", ok: true },
+      { label: "Acompanhamento semanal (check-in)", ok: true },
       { label: "Relatório mensal de progresso", ok: true },
-      { label: "Videochamada mensal (30 min)", ok: true },
     ],
   },
 ];
@@ -63,11 +60,9 @@ const tableRows = [
   { label: "Preço/mês", starter: "R$ 39,90", plus: "R$ 89,90", premium: "R$ 179,90", type: "text" as const },
   { label: "Acesso à plataforma", starter: true, plus: true, premium: true, type: "bool" as const },
   { label: "Treino personalizado", starter: true, plus: true, premium: true, type: "bool" as const },
-  { label: "Acompanhamento semanal", starter: false, plus: true, premium: true, type: "bool" as const },
+  { label: "Acompanhamento", starter: "Mensal", plus: "Quinzenal", premium: "Semanal", type: "text" as const },
   { label: "Fotos e progresso", starter: false, plus: true, premium: true, type: "bool" as const },
-  { label: "Videochamada mensal", starter: false, plus: false, premium: "30 min", type: "mixed" as const },
-  { label: "Prioridade no atendimento", starter: "72h", plus: "24h", premium: "12h", type: "text" as const },
-  { label: "Presencial (Cotia/SP)", starter: false, plus: "+ valor", premium: "+ valor", type: "mixed" as const },
+  { label: "Prioridade no atendimento", starter: "24h", plus: "24h", premium: "24h", type: "text" as const },
 ];
 
 export function Plans() {

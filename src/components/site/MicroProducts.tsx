@@ -1,8 +1,11 @@
 /* eslint-disable prettier/prettier */
-import { motion } from "framer-motion";
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import { Home, Dumbbell, Flame } from "lucide-react";
 
-const products = [
+type Gender = "masculino" | "feminino";
+
+const productTemplates = [
   {
     icon: Home,
     name: "Planilha de Treino — Casa",
@@ -23,6 +26,16 @@ const products = [
   },
 ];
 
+const genders: { key: Gender; label: string }[] = [
+  { key: "masculino", label: "Masculino" },
+  { key: "feminino", label: "Feminino" },
+];
+
+const productsByGender: Record<Gender, typeof productTemplates> = {
+  masculino: productTemplates.map((p) => ({ ...p, name: `${p.name} — Masculino` })),
+  feminino: productTemplates.map((p) => ({ ...p, name: `${p.name} — Feminino` })),
+};
+
 const WHATSAPP = "5511959222489";
 
 function buildProductMessage(name: string, price: string): string {
@@ -32,6 +45,9 @@ function buildProductMessage(name: string, price: string): string {
 }
 
 export function MicroProducts() {
+  const [gender, setGender] = useState<Gender>("masculino");
+  const products = productsByGender[gender];
+
   return (
     <section id="produtos" className="relative py-28 px-6 overflow-hidden">
       <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_right,rgba(225,6,0,0.05),transparent_55%)]" />
@@ -53,18 +69,61 @@ export function MicroProducts() {
             borderBottom: "1.5px solid rgba(225,6,0,0.35)",
             paddingBottom: 4,
           }}>
-            Produtos digitais
+            Planilhas de treino
           </p>
           <h2 className="font-display text-4xl md:text-6xl font-bold leading-tight">
             Sem mensalidade.<br />Resultado direto.
           </h2>
           <p className="text-muted-foreground mt-4 max-w-xl mx-auto text-base leading-relaxed">
-            Compra única. Sem assinatura. Perfeito para quem quer começar com investimento mínimo.
+            Compra única. Sem assinatura. Planilhas prontas, masculino e feminino, para começar com investimento mínimo.
           </p>
         </motion.div>
 
+        {/* Gender tabs */}
+        <div style={{ display: "flex", justifyContent: "center", marginBottom: 40 }}>
+          <div style={{
+            display: "inline-flex",
+            background: "rgba(255,255,255,0.03)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            borderRadius: 999,
+            padding: 4,
+            gap: 4,
+          }}>
+            {genders.map((g) => (
+              <button
+                key={g.key}
+                type="button"
+                onClick={() => setGender(g.key)}
+                style={{
+                  padding: "9px 28px",
+                  borderRadius: 999,
+                  border: "none",
+                  cursor: "pointer",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  letterSpacing: "0.02em",
+                  background: gender === g.key ? "#E10600" : "transparent",
+                  color: gender === g.key ? "#fff" : "rgba(255,255,255,0.55)",
+                  boxShadow: gender === g.key ? "0 0 16px rgba(225,6,0,0.35)" : "none",
+                  transition: "all 0.2s",
+                }}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Individual products */}
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <AnimatePresence mode="wait">
+        <motion.div
+          key={gender}
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -12 }}
+          transition={{ duration: 0.3 }}
+          className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5"
+        >
           {products.map((p, i) => {
             const Icon = p.icon;
             return (
@@ -122,7 +181,8 @@ export function MicroProducts() {
               </motion.div>
             );
           })}
-        </div>
+        </motion.div>
+        </AnimatePresence>
 
         <p className="text-center text-xs text-muted-foreground mt-8">
           Todos os produtos são entregues digitalmente via WhatsApp após confirmação do pagamento.

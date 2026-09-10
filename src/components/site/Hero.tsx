@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 import { motion } from "framer-motion";
 import { ArrowRight, Play } from "lucide-react";
-import heroImg from "@/assets/shape/depois-3.jpg";
+import heroImg from "@/assets/shape/foto-capa.jpeg";
 
 const stats = [
   { v: "850+", l: "Alunos transformados" },
@@ -107,7 +107,7 @@ export function Hero() {
               src={heroImg}
               alt="Guilherme Couto, personal trainer"
               className="absolute inset-0 h-full w-full object-cover"
-              style={{ transform: "scale(1.9)", transformOrigin: "68% 47%" }}
+              style={{ objectPosition: "50% 20%" }}
               width={1200}
               height={1600}
             />
