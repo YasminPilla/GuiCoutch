@@ -17,7 +17,6 @@ const specialities = [
 const stats = [
   { value: "200+", label: "alunos" },
   { value: "4 anos", label: "experiência" },
-  { value: "94%", label: "retenção" },
 ];
 
 export function About() {
@@ -384,8 +383,9 @@ export function About() {
               </h2>
               <p className="ab-bio">
                 Formado em <strong>Bacharelado em Educação Física pela UNESP – Rio Claro</strong>,
-                trabalho com treinamento personalizado — desenvolvido de acordo com os
-                objetivos, necessidades e rotina de cada aluno.
+                atendo presencialmente em <strong>Cotia/SP</strong> e faço acompanhamento online
+                para alunos de todo o Brasil — com treino personalizado, desenvolvido de acordo
+                com os objetivos, necessidades e rotina de cada aluno.
               </p>
 
               <div className="ab-stats">

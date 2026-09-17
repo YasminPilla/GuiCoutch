@@ -4,9 +4,8 @@ import { ArrowRight, Play } from "lucide-react";
 import heroImg from "@/assets/shape/foto-capa.jpeg";
 
 const stats = [
-  { v: "850+", l: "Alunos transformados" },
-  { v: "94%", l: "Taxa de retenção" },
-  { v: "12", l: "Anos de experiência" },
+  { v: "200+", l: "Alunos transformados" },
+  { v: "4", l: "Anos de experiência" },
 ];
 
 export function Hero() {
@@ -28,7 +27,7 @@ export function Hero() {
             className="inline-flex items-center gap-2 rounded-full glass px-4 py-1.5 text-xs text-muted-foreground mb-6 md:mb-8"
           >
             <span className="h-2 w-2 rounded-full bg-neon animate-pulse-glow" />
-            Vagas abertas para 2026 · Turma limitada
+            Personal em Cotia/SP · Presencial ou Online
           </motion.div>
 
           <motion.h1
@@ -52,7 +51,7 @@ export function Hero() {
             transition={{ duration: 0.8, delay: 0.25 }}
             className="mt-6 md:mt-8 text-base md:text-lg text-muted-foreground max-w-xl leading-relaxed"
           >
-            Treino individualizado, direto ao ponto — sem fórmula pronta.
+            Personal trainer em Cotia/SP — treino individualizado e acompanhamento contínuo, direto ao ponto, sem fórmula pronta.
           </motion.p>
 
           <motion.div
@@ -82,7 +81,7 @@ export function Hero() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 1, delay: 0.6 }}
-            className="mt-10 md:mt-16 grid grid-cols-3 gap-3 md:gap-6 max-w-xl"
+            className="mt-10 md:mt-16 grid grid-cols-2 gap-3 md:gap-6 max-w-xl"
           >
             {stats.map((s) => (
               <div key={s.l} className="border-l border-border pl-3 md:pl-4">
@@ -102,12 +101,12 @@ export function Hero() {
           transition={{ duration: 1.2, ease: "easeOut" }}
           className="lg:col-span-5 relative order-first lg:order-none"
         >
-          <div className="relative aspect-[4/3] sm:aspect-[3/4] rounded-2xl md:rounded-3xl overflow-hidden">
+          <div className="relative aspect-[3/4] rounded-2xl md:rounded-3xl overflow-hidden">
             <img
               src={heroImg}
               alt="Guilherme Couto, personal trainer"
               className="absolute inset-0 h-full w-full object-cover"
-              style={{ objectPosition: "50% 20%" }}
+              style={{ objectPosition: "50% 15%" }}
               width={1200}
               height={1600}
             />

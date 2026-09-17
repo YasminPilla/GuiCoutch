@@ -27,15 +27,41 @@ const personJsonLd = {
   hasCredential: "CREF 098765-G/SP",
   address: {
     "@type": "PostalAddress",
-    addressLocality: "São Paulo",
+    addressLocality: "Cotia",
     addressRegion: "SP",
     addressCountry: "BR",
   },
+  areaServed: [
+    { "@type": "City", name: "Cotia" },
+    { "@type": "AdministrativeArea", name: "Grande São Paulo" },
+    { "@type": "Country", name: "Brasil" },
+  ],
   knowsAbout: [
     "Emagrecimento",
     "Hipertrofia",
     "Treinamento de Força",
     "Correção Postural",
+  ],
+  makesOffer: [
+    {
+      "@type": "Offer",
+      itemOffered: {
+        "@type": "Service",
+        name: "Treino Personalizado",
+        areaServed: "Cotia, SP",
+        description:
+          "Treino individualizado, presencial em Cotia/SP ou online para todo o Brasil.",
+      },
+    },
+    {
+      "@type": "Offer",
+      itemOffered: {
+        "@type": "Service",
+        name: "Acompanhamento",
+        description:
+          "Acompanhamento contínuo de evolução, ajustes de treino e suporte direto com o coach.",
+      },
+    },
   ],
 };
 
@@ -99,7 +125,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => {
     const description =
-      "Acompanhamento profissional de alto desempenho. Treino, evolução e suporte contínuo com método estratégico.";
+      "Personal trainer em Cotia/SP: treinos personalizados e acompanhamento contínuo, presencial ou online, para emagrecimento, hipertrofia e performance.";
     const ogImage = `${SITE_URL}/og-image.jpg`;
 
     return {
@@ -108,6 +134,11 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         { name: "viewport", content: "width=device-width, initial-scale=1" },
         { title: SITE_NAME },
         { name: "description", content: description },
+        {
+          name: "keywords",
+          content:
+            "personal trainer Cotia, personal trainer em Cotia, personal Cotia SP, treino personalizado, acompanhamento fitness, treino presencial Cotia",
+        },
         { name: "author", content: "Guilherme Couto" },
         { property: "og:title", content: SITE_NAME },
         { property: "og:description", content: description },
