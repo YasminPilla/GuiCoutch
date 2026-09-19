@@ -35,6 +35,18 @@ import {
   type ProgressPhoto,
   type WorkoutSession,
 } from "@/components/site/SharedAppState";
+import {
+  MAX_SETS,
+  MAX_REPS,
+  WEIGHT_REQUIRED_MESSAGE,
+  createInitialLogs,
+  commitLog,
+  revertLog,
+  validateLog,
+  hasPendingChanges,
+  findInvalidDone,
+  formatWeight,
+} from "@/lib/workout-log";
 
 // ─── CONSTANTES ───────────────────────────────────────────────────────────
 const N      = "#00FF88";
@@ -139,8 +151,9 @@ const GENERIC_WEIGHT_OPTIONS = [
   60, 70, 80, 90, 100, 120, 140, 160, 180, 200,
 ].map(fmtKg);
 
-// limite pedido: no máximo 20 reps por registro de treino
-const REPS_OPTIONS = Array.from({ length: 20 }, (_, i) => String(i + 1));
+// limites pedidos: no máximo 5 séries e 20 reps por registro de treino
+const SETS_OPTIONS = Array.from({ length: MAX_SETS }, (_, i) => String(i + 1));
+const REPS_OPTIONS = Array.from({ length: MAX_REPS }, (_, i) => String(i + 1));
 
 function resolveEquipment(exerciseName, library = []) {
   if (!exerciseName) return null;
@@ -381,24 +394,23 @@ function Dropdown({ options, value, onChange, isDark, accent }: any) {
 
 // ─── EditableDropdown — combobox que sugere valores mas aceita digitar ────
 // Usado para Peso / Séries / Reps no registro de treino.
-function EditableDropdown({ value, onChange, options, isDark, accent, placeholder }: any) {
+function EditableDropdown({ value, onChange, options, isDark, accent, placeholder, error, ariaLabel }: any) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState(value != null ? String(value) : "");
   const ref = useRef<HTMLDivElement>(null);
-  const color = accent || N;
+  const color = error ? DANGER : accent || N;
 
   useEffect(() => { setQuery(value != null ? String(value) : ""); }, [value]);
 
+  // Só fecha a lista ao clicar fora. O valor digitado já é aplicado a cada tecla
+  // (antes só era aplicado ao clicar fora, e por isso alterações se perdiam).
   useEffect(() => {
     function h(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) {
-        setOpen(false);
-        if (query !== String(value)) onChange(query);
-      }
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     }
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
-  }, [query, value, onChange]);
+  }, []);
 
   const filtered = useMemo(() => {
     if (!query.trim()) return options;
@@ -417,12 +429,14 @@ function EditableDropdown({ value, onChange, options, isDark, accent, placeholde
       <input
         value={query}
         onFocus={() => setOpen(true)}
-        onChange={e => { setQuery(e.target.value); setOpen(true); }}
+        onChange={e => { setQuery(e.target.value); onChange(e.target.value); setOpen(true); }}
         placeholder={placeholder}
+        aria-label={ariaLabel}
+        aria-invalid={error ? true : undefined}
         style={{
           width: "100%", boxSizing: "border-box",
           background: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
-          border: `1px solid ${open ? color + "66" : isDark ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.09)"}`,
+          border: `1px solid ${error ? DANGER : open ? color + "66" : isDark ? "rgba(255,255,255,0.09)" : "rgba(0,0,0,0.09)"}`,
           color: "inherit", borderRadius: 12, padding: "10px 12px",
           fontSize: "0.93em", fontWeight: 700, textAlign: "center",
           outline: "none", fontFamily: "inherit",
@@ -884,7 +898,7 @@ function ReportsTab({ sd, accent, extraSessions = [] }: any) {
                       <div style={{ fontWeight: 600, marginBottom: 6 }}>{ex.exerciseName}</div>
                       <div style={{ display: "flex", gap: 16, fontSize: "0.86em", color: "var(--muted)", flexWrap: "wrap" }}>
                         <span>{ex.actualSets} séries × {ex.actualReps} reps</span>
-                        <span>@ {ex.actualWeight || "Peso corporal"}</span>
+                        <span>@ {formatWeight(ex.actualWeight)}</span>
                         <span>RPE {ex.rpe}</span>
                       </div>
                       {ex.notes && <div style={{ fontSize: "0.86em", color, marginTop: 4 }}>{ex.notes}</div>}
@@ -1761,7 +1775,7 @@ function SurveyResponseModal({ survey, accent, onClose, onSubmit }: any) {
 }
 
 // ─── WORKOUT CAROUSEL MODAL (NAVEGAÇÃO LIVRE) ─────────────────────────────
-function WorkoutCarouselModal({
+export function WorkoutCarouselModal({
   workout,
   workoutLogs,
   setWorkoutLogs,
@@ -1784,6 +1798,11 @@ function WorkoutCarouselModal({
   const [showFeedback,  setShowFeedback]  = useState(false);
   const [showExList,    setShowExList]    = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
+  // índice do exercício em que o aluno tentou concluir/salvar — só então os erros aparecem
+  const [attemptedIdx,  setAttemptedIdx]  = useState<number | null>(null);
+  // ação (navegar/fechar/resumo) aguardando o aluno decidir o que fazer com alterações não salvas
+  const [leaveGuard,    setLeaveGuard]    = useState<{ action: () => void } | null>(null);
+  const [saveError,     setSaveError]     = useState("");
 
   const color          = accent || N;
   const total          = workoutLogs.length;
@@ -1794,6 +1813,12 @@ function WorkoutCarouselModal({
   const skippedCount   = skippedStatus.filter(Boolean).length;
   const allEvaluated   = completedCount + skippedCount === total;
   const isLastExercise = currentIdx === total - 1;
+
+  // peso/séries/reps mudaram desde a última vez que foram salvos?
+  const pending       = hasPendingChanges(log);
+  const pendingDone   = pending && !!isDone;
+  const errors        = log ? validateLog(log) : {};
+  const showErrors    = attemptedIdx === currentIdx;
 
   // ── NOVO: exercício planejado atual — usado para saber o equipamento
   // que o coach definiu para este exercício específico do treino.
@@ -1811,22 +1836,56 @@ function WorkoutCarouselModal({
     [log?.exerciseName, exerciseLibrary, currentPlannedEx?.equipment]
   );
 
-  function go(nextIdx: number) {
+  function doGo(nextIdx: number) {
     setDirection(nextIdx > currentIdx ? 1 : -1);
     setCurrentIdx(nextIdx);
     setShowExList(false);
+    setAttemptedIdx(null);
+    setSaveError("");
+  }
+
+  // Se há alterações não salvas no exercício atual, pergunta antes de sair.
+  function requestLeave(action: () => void) {
+    if (pending) setLeaveGuard({ action });
+    else action();
+  }
+
+  function go(nextIdx: number) {
+    if (nextIdx === currentIdx) { setShowExList(false); return; }
+    requestLeave(() => doGo(nextIdx));
   }
 
   function goNext() { if (currentIdx < total - 1) go(currentIdx + 1); }
   function goPrev() { if (currentIdx > 0) go(currentIdx - 1); }
 
-  function handleValidate() {
+  function replaceLog(idx: number, fn: (l: any) => any) {
+    setWorkoutLogs(workoutLogs.map((l: any, i: number) => (i === idx ? fn(l) : l)));
+  }
+
+  // Conclui o exercício (ou salva a alteração de um já concluído).
+  // Só funciona se peso/séries/reps forem válidos — o peso é obrigatório.
+  function commitCurrent(): boolean {
+    if (Object.keys(validateLog(log)).length > 0) {
+      setAttemptedIdx(currentIdx);
+      return false;
+    }
+    replaceLog(currentIdx, commitLog);
     const nextDone = [...doneStatus];
     nextDone[currentIdx] = true;
     const nextSkip = [...skippedStatus];
     nextSkip[currentIdx] = false;
     setDoneStatus(nextDone);
     setSkippedStatus(nextSkip);
+    setAttemptedIdx(null);
+    setSaveError("");
+    return true;
+  }
+
+  function handleValidate() { commitCurrent(); }
+
+  function handleDiscard() {
+    replaceLog(currentIdx, revertLog);
+    setAttemptedIdx(null);
   }
 
   function handleSkip() {
@@ -1836,12 +1895,15 @@ function WorkoutCarouselModal({
       setSkippedStatus(next);
       return;
     }
+    // pular = não fez: descarta o que estava digitado e ainda não salvo
+    if (pending) replaceLog(currentIdx, revertLog);
     const nextSkip = [...skippedStatus];
     nextSkip[currentIdx] = true;
     const nextDone = [...doneStatus];
     nextDone[currentIdx] = false;
     setSkippedStatus(nextSkip);
     setDoneStatus(nextDone);
+    setAttemptedIdx(null);
   }
 
   function handleUndo() {
@@ -1854,9 +1916,21 @@ function WorkoutCarouselModal({
   }
 
   function updateLog(key: string, value: any) {
-    const next = [...workoutLogs];
-    next[currentIdx][key] = value;
-    setWorkoutLogs(next);
+    replaceLog(currentIdx, l => ({ ...l, [key]: value }));
+    setSaveError("");
+  }
+
+  function guardSave() {
+    const action = leaveGuard?.action;
+    if (commitCurrent()) { setLeaveGuard(null); action?.(); }
+    else setLeaveGuard(null); // fica no exercício; os erros aparecem nos campos
+  }
+
+  function guardDiscard() {
+    const action = leaveGuard?.action;
+    handleDiscard();
+    setLeaveGuard(null);
+    action?.();
   }
 
   function computeDuration() {
@@ -1870,20 +1944,33 @@ function WorkoutCarouselModal({
   }
 
   function handleSave() {
+    // segurança: nunca salva exercício concluído sem peso (ex: cache de treino antigo)
+    const invalid = findInvalidDone(workoutLogs, doneStatus);
+    if (invalid.length > 0) {
+      const first = invalid[0];
+      setShowFeedback(false);
+      setCurrentIdx(first);
+      setAttemptedIdx(first);
+      setSaveError(`"${workoutLogs[first].exerciseName}" está concluído sem peso. Informe o peso que você usou.`);
+      return;
+    }
     const session: WorkoutSession = {
       id: `s${Date.now()}`,
       date: todayLocalDateStr(),
       workoutName: workout.name,
-      exercises: workoutLogs.map((l: any) => ({
-        exerciseId:   l.exerciseId,
-        exerciseName: l.exerciseName,
-        actualWeight: l.actualWeight,
-        actualReps:   l.actualReps,
-        actualSets:   l.actualSets,
-        restTime:     l.restTime,
-        rpe:          l.rpe,
-        notes:        l.notes,
-      })),
+      // só entram no relatório os exercícios realmente concluídos
+      exercises: workoutLogs
+        .filter((_: any, i: number) => doneStatus[i])
+        .map((l: any) => ({
+          exerciseId:   l.exerciseId,
+          exerciseName: l.exerciseName,
+          actualWeight: String(l.actualWeight).trim(),
+          actualReps:   Number(l.actualReps),
+          actualSets:   Number(l.actualSets),
+          restTime:     l.restTime,
+          rpe:          l.rpe,
+          notes:        l.notes,
+        })),
       energyLevel:      postWorkoutData.energyLevel,
       mood:             "Normal",
       sleepQuality:     7,
@@ -1955,7 +2042,7 @@ function WorkoutCarouselModal({
                   <Menu size={15} /> Lista
                 </button>
               )}
-              <button onClick={onClose}
+              <button onClick={() => requestLeave(onClose)} aria-label="Fechar treino"
                 style={{ background: "rgba(255,255,255,0.07)", border: "none", borderRadius: 10, padding: 8, color: isDark ? "#aaa" : "#666", cursor: "pointer" }}>
                 <X size={18} />
               </button>
@@ -2091,43 +2178,66 @@ function WorkoutCarouselModal({
                     </div>
                   </div>
 
-                  {/* ── Séries (fixo, definido pelo coach) / Reps / Peso como dropdown editável ── */}
+                  {/* ── Séries / Reps / Peso: dropdowns editáveis. Peso é obrigatório para concluir ── */}
+                  {saveError && (
+                    <div role="alert" style={{ marginBottom: 12, padding: "10px 12px", borderRadius: 10, fontSize: "0.86em", fontWeight: 600,
+                      color: DANGER, background: `${DANGER}12`, border: `1px solid ${DANGER}33` }}>
+                      {saveError}
+                    </div>
+                  )}
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 12 }}>
                     <div>
                       <label style={{ fontSize: "0.71em", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 6 }}>Séries</label>
-                      <div style={{
-                        width: "100%", boxSizing: "border-box",
-                        background: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.03)",
-                        border: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)"}`,
-                        color: "var(--muted)", borderRadius: 12, padding: "10px 12px",
-                        fontSize: "0.93em", fontWeight: 700, textAlign: "center",
-                      }}>
-                        {log?.actualSets ?? ""}
-                      </div>
+                      <EditableDropdown
+                        ariaLabel="Séries"
+                        value={String(log?.actualSets ?? "")}
+                        onChange={v => updateLog("actualSets", v)}
+                        options={SETS_OPTIONS}
+                        isDark={isDark}
+                        accent={color}
+                        placeholder="Ex: 3"
+                        error={showErrors && !!errors.sets}
+                      />
                     </div>
                     <div>
                       <label style={{ fontSize: "0.71em", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 6 }}>Reps</label>
                       <EditableDropdown
+                        ariaLabel="Reps"
                         value={String(log?.actualReps ?? "")}
                         onChange={v => updateLog("actualReps", v)}
                         options={REPS_OPTIONS}
                         isDark={isDark}
                         accent={color}
                         placeholder="Ex: 12"
+                        error={showErrors && !!errors.reps}
                       />
                     </div>
                     <div>
-                      <label style={{ fontSize: "0.71em", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 6 }}>Peso</label>
+                      <label style={{ fontSize: "0.71em", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 6 }}>Peso *</label>
                       <EditableDropdown
+                        ariaLabel="Peso"
                         value={log?.actualWeight ?? ""}
                         onChange={v => updateLog("actualWeight", v)}
                         options={weightOptions}
                         isDark={isDark}
                         accent={color}
-                        placeholder="Ex: 12kg"
+                        placeholder={currentPlannedEx?.plannedLoad ? `Plan.: ${currentPlannedEx.plannedLoad}` : "Ex: 12kg"}
+                        error={showErrors && !!errors.weight}
                       />
                     </div>
                   </div>
+                  {showErrors && (errors.weight || errors.sets || errors.reps) && (
+                    <div role="alert" style={{ fontSize: "0.79em", color: DANGER, fontWeight: 600, marginBottom: 12 }}>
+                      {[errors.weight, errors.sets, errors.reps].filter(Boolean).map((m, i) => <div key={i}>{m}</div>)}
+                    </div>
+                  )}
+                  {!String(log?.actualWeight ?? "").trim() && currentPlannedEx?.plannedLoad && (
+                    <button type="button" onClick={() => updateLog("actualWeight", currentPlannedEx.plannedLoad)}
+                      style={{ marginBottom: 12, background: "none", border: `1px dashed ${color}55`, color, borderRadius: 10,
+                        padding: "6px 10px", fontSize: "0.79em", fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}>
+                      Usei o planejado ({currentPlannedEx.plannedLoad})
+                    </button>
+                  )}
 
                   <div style={{ marginBottom: 20 }}>
                     <label style={{ fontSize: "0.71em", color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 6 }}>Observações</label>
@@ -2142,15 +2252,28 @@ function WorkoutCarouselModal({
               </AnimatePresence>
 
               <div style={{ padding: "0 20px 20px", display: "flex", flexDirection: "column", gap: 10 }}>
-                <button onClick={handleValidate} disabled={isDone}
+                {pendingDone && (
+                  <div role="status" style={{ padding: "10px 12px", borderRadius: 12, fontSize: "0.86em",
+                    color: YELLOW, background: `${YELLOW}12`, border: `1px solid ${YELLOW}33`,
+                    display: "flex", alignItems: "center", gap: 8 }}>
+                    <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                    <span style={{ flex: 1 }}>Você alterou peso/séries/reps e ainda não salvou.</span>
+                    <button type="button" onClick={handleDiscard}
+                      style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer",
+                        textDecoration: "underline", fontSize: "0.93em", fontFamily: "inherit" }}>
+                      Descartar
+                    </button>
+                  </div>
+                )}
+                <button onClick={handleValidate} disabled={isDone && !pendingDone}
                   style={{ width: "100%", padding: "14px", borderRadius: 14, border: "none",
-                    cursor: isDone ? "default" : "pointer",
-                    background: isDone ? `${color}33` : color,
-                    color: isDone ? color : "#000",
+                    cursor: isDone && !pendingDone ? "default" : "pointer",
+                    background: isDone && !pendingDone ? `${color}33` : color,
+                    color: isDone && !pendingDone ? color : "#000",
                     fontFamily: "inherit", fontWeight: 700, fontSize: "1.07em",
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
                   <CheckCircle2 size={18} />
-                  {isDone ? "Exercício Concluído ✓" : "Marcar como Concluído"}
+                  {pendingDone ? "Salvar alteração" : isDone ? "Exercício Concluído ✓" : "Marcar como Concluído"}
                 </button>
 
                 <div style={{ display: "flex", gap: 10 }}>
@@ -2185,7 +2308,7 @@ function WorkoutCarouselModal({
                   </button>
                 </div>
 
-                <button onClick={() => setShowFeedback(true)}
+                <button onClick={() => requestLeave(() => setShowFeedback(true))}
                   style={{ width: "100%", padding: "11px", borderRadius: 12,
                     border: `1px solid ${(allEvaluated || isLastExercise) ? color + "66" : isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`,
                     background: (allEvaluated || isLastExercise) ? `${color}14` : "transparent",
@@ -2226,7 +2349,7 @@ function WorkoutCarouselModal({
                     </div>
                     <div style={{ flex: 1, fontSize: "0.86em", color: doneStatus[i] ? color : skippedStatus[i] ? DANGER : "var(--muted)" }}>{l.exerciseName}</div>
                     {doneStatus[i] && (
-                      <div style={{ fontSize: "0.79em", color: "var(--muted)" }}>{l.actualSets}×{l.actualReps} @ {l.actualWeight}</div>
+                      <div style={{ fontSize: "0.79em", color: "var(--muted)" }}>{l.actualSets}×{l.actualReps} @ {formatWeight(l.actualWeight)}</div>
                     )}
                   </div>
                 ))}
@@ -2285,6 +2408,48 @@ function WorkoutCarouselModal({
         </div>
       </motion.div>
     </motion.div>
+
+    {/* ── Alterações não salvas: pergunta antes de sair do exercício ── */}
+    <AnimatePresence>
+      {leaveGuard && (
+        <motion.div
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.85)", zIndex: 160,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 16, backdropFilter: "blur(6px)" }}>
+          <motion.div role="alertdialog" aria-label="Alterações não salvas"
+            initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+            style={{ width: "100%", maxWidth: 420, padding: 20, borderRadius: 20,
+              background: isDark ? "#141414" : "#f8f9fa",
+              border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}` }}>
+            <div style={{ fontFamily: "system-ui,sans-serif", fontSize: "1.14em", fontWeight: 800, marginBottom: 6 }}>
+              {isDone ? "Salvar alteração?" : "Concluir exercício?"}
+            </div>
+            <div style={{ fontSize: "0.93em", color: "var(--muted)", marginBottom: 16 }}>
+              {isDone
+                ? `Você alterou o peso, as séries ou as reps de "${log?.exerciseName}" e ainda não salvou.`
+                : `Você preencheu "${log?.exerciseName}" mas não marcou como concluído.`}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <button onClick={guardSave}
+                style={{ padding: "12px", borderRadius: 12, border: "none", background: color, color: "#000",
+                  fontFamily: "inherit", fontWeight: 700, fontSize: "1em", cursor: "pointer" }}>
+                {isDone ? "Salvar alteração" : "Concluir e salvar"}
+              </button>
+              <button onClick={guardDiscard}
+                style={{ padding: "12px", borderRadius: 12, background: "transparent", color: DANGER,
+                  border: `1px solid ${DANGER}55`, fontFamily: "inherit", fontWeight: 600, fontSize: "1em", cursor: "pointer" }}>
+                Descartar alteração
+              </button>
+              <button onClick={() => setLeaveGuard(null)}
+                style={{ padding: "10px", borderRadius: 12, background: "transparent", color: "var(--muted)",
+                  border: "none", fontFamily: "inherit", fontWeight: 600, fontSize: "0.93em", cursor: "pointer" }}>
+                Continuar editando
+              </button>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
 
     {/* ── Modal de Observação: explicação do exercício + vídeo do YouTube ── */}
     <AnimatePresence>
@@ -2454,18 +2619,9 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
     setSelectedWorkout(w);
     setWorkoutStartTime(Date.now());
     const exToUse = exercises || w.exercises || [];
-    setWorkoutLogs(exToUse.map((ex: any) => ({
-      exerciseId:   ex.id,
-      exerciseName: ex.name,
-      // Peso mantém o texto planejado (ex: "70kg", "PC") — o coach já formatou certo
-      actualWeight: ex.plannedLoad || "",
-      // limites pedidos: no máximo 5 séries e 20 reps
-      actualSets:   String(Math.min(5, Math.max(1, parseInt(ex.plannedSets) || 3))),
-      actualReps:   String(Math.min(20, Math.max(1, parseInt(ex.plannedReps) || 10))),
-      restTime:     settings.defaultRestTime,
-      rpe:          7,
-      notes:        "",
-    })));
+    // Peso começa vazio: a carga planejada é só sugestão; o aluno informa o que
+    // realmente aguentou (obrigatório para concluir o exercício).
+    setWorkoutLogs(createInitialLogs(exToUse, settings.defaultRestTime));
     setPostWorkoutData({ energyLevel: 7, generalNotes: "" });
     setWorkoutCurrentIdx(0);
     setWorkoutDoneStatus(exToUse.map(() => false));

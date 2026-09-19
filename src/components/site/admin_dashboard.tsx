@@ -20,6 +20,8 @@ import {
   BookOpen, Filter, Tag, Zap, Star, ClipboardList,
 } from "lucide-react";
 
+import { formatWeight, parseWeightKg } from "@/lib/workout-log";
+
 import {
   useAdminProps,
   AdminPhotosTab,
@@ -2784,7 +2786,7 @@ function SessionDetailModal({ session, onClose, accent = N }) {
           <div style={{ fontWeight: 600, fontSize: 13, marginBottom: 4 }}>{ex.exerciseName}</div>
           <div style={{ display: "flex", gap: 16, fontSize: 12, color: MUTED2, flexWrap: "wrap" }}>
             <span>{ex.actualSets} séries × {ex.actualReps} reps</span>
-            <span>@ {ex.actualWeight > 0 ? `${ex.actualWeight}kg` : "Peso corporal"}</span>
+            <span>@ {formatWeight(ex.actualWeight)}</span>
             <span style={{ color: AMBER }}>RPE {ex.rpe}</span>
             <span>Descanso: {ex.restTime}s</span>
           </div>
@@ -2820,8 +2822,9 @@ function TabRelatorios({ users, studentsData, toast, confirm, surveys, surveyRes
   allExercises.forEach(ex => {
     if (!exerciseStats[ex.exerciseName]) exerciseStats[ex.exerciseName] = { name: ex.exerciseName, count: 0, totalSets: 0, maxWeight: 0 };
     exerciseStats[ex.exerciseName].count++;
-    exerciseStats[ex.exerciseName].totalSets += ex.actualSets || 0;
-    if ((ex.actualWeight || 0) > exerciseStats[ex.exerciseName].maxWeight) exerciseStats[ex.exerciseName].maxWeight = ex.actualWeight || 0;
+    exerciseStats[ex.exerciseName].totalSets += Number(ex.actualSets) || 0;
+    const weightKg = parseWeightKg(ex.actualWeight);
+    if (weightKg > exerciseStats[ex.exerciseName].maxWeight) exerciseStats[ex.exerciseName].maxWeight = weightKg;
   });
   const exerciseList = Object.values(exerciseStats).sort((a, b) => b.count - a.count);
   const attendanceMap = buildAttendanceCalendar(allSessions);
@@ -3041,7 +3044,7 @@ function TabRelatorios({ users, studentsData, toast, confirm, surveys, surveyRes
                               <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "6px 10px", background: CARD_BG2, borderRadius: 8 }}>
                                 <CheckCircle2 size={13} style={{ color: ex.actualSets > 0 ? N : DANGER, flexShrink: 0 }} />
                                 <div style={{ flex: 1, minWidth: 0 }}><span style={{ fontSize: 12, fontWeight: 600 }}>{ex.exerciseName}</span></div>
-                                <div style={{ fontSize: 11, color: MUTED2, flexShrink: 0 }}>{ex.actualSets}× {ex.actualReps} reps{ex.actualWeight > 0 && ` @ ${ex.actualWeight}kg`}</div>
+                                <div style={{ fontSize: 11, color: MUTED2, flexShrink: 0 }}>{ex.actualSets}× {ex.actualReps} reps @ {formatWeight(ex.actualWeight)}</div>
                                 <div style={{ fontSize: 10, color: AMBER, flexShrink: 0 }}>RPE {ex.rpe}</div>
                               </div>
                             ))}
