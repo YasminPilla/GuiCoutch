@@ -25,6 +25,7 @@ export interface User {
   status: "active" | "inactive";
   createdAt: string;
   authUid?: string;
+  plan?: "starter" | "plus" | "premium";
 }
 
 export interface Exercise {

@@ -21,6 +21,7 @@ import {
 } from "lucide-react";
 
 import { formatWeight, parseWeightKg } from "@/lib/workout-log";
+import { PLANS, DEFAULT_PLAN, getPlan } from "@/lib/plans";
 
 import {
   useAdminProps,
@@ -258,6 +259,54 @@ function KpiCard({ icon: Icon, label, value, delta, color = N }) {
 
 function Badge({ children, variant = "green" }) {
   return <span className={`badge badge-${variant}`}>{children}</span>;
+}
+
+function PlanBadge({ plan }) {
+  const p = getPlan(plan);
+  if (!p) return <span style={{ fontSize: 10, color: MUTED }}>Sem plano</span>;
+  return (
+    <span style={{
+      display: "inline-block", fontSize: 10, fontWeight: 700, letterSpacing: ".04em", textTransform: "uppercase",
+      color: p.color, background: `${p.color}18`, border: `1px solid ${p.color}44`,
+      borderRadius: 99, padding: "1px 8px",
+    }}>{p.name}</span>
+  );
+}
+
+// Seletor de plano em cartões — usado no cadastro e na edição do aluno.
+function PlanPicker({ value, onChange }) {
+  return (
+    <div style={{ display: "grid", gap: 8 }}>
+      {PLANS.map(p => {
+        const active = value === p.key;
+        const freq = p.items.find(i => i.label.startsWith("Acompanhamento"))?.label;
+        return (
+          <button type="button" key={p.key} onClick={() => onChange(p.key)} aria-pressed={active}
+            style={{
+              display: "flex", alignItems: "center", gap: 12, textAlign: "left", cursor: "pointer",
+              background: active ? `${p.color}14` : CARD_BG,
+              border: `1px solid ${active ? p.color : BORDER}`,
+              borderRadius: 10, padding: "10px 14px", color: "#f0f0f0",
+              fontFamily: "'DM Sans', sans-serif",
+            }}>
+            <span style={{
+              width: 16, height: 16, borderRadius: "50%", flexShrink: 0,
+              border: `2px solid ${active ? p.color : BORDER2}`,
+              background: active ? p.color : "transparent",
+              boxShadow: active ? `inset 0 0 0 3px #111` : "none",
+            }} />
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: active ? p.color : "#f0f0f0" }}>
+                {p.name}{p.popular ? " · mais popular" : ""}
+              </span>
+              <span style={{ display: "block", fontSize: 11, color: MUTED, marginTop: 2 }}>{freq}</span>
+            </span>
+            <span style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>R$ {p.price}<span style={{ fontSize: 10, fontWeight: 400, color: MUTED }}>/mês</span></span>
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 function ProgressBar({ value, max = 100, color = N }) {
@@ -667,7 +716,7 @@ function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, o
   const [newModal,  setNewModal]  = useState(false);
   const [editModal, setEditModal] = useState(null);
   const [editForm,  setEditForm]  = useState({});
-  const [newForm,   setNewForm]   = useState({ name: "", email: "", password: "", goal: "Perder gordura" });
+  const [newForm,   setNewForm]   = useState({ name: "", email: "", password: "", goal: "Perder gordura", plan: DEFAULT_PLAN });
   const [formErrors,setFormErrors]= useState({});
 
   const students = users.filter(u => u.role === "student");
@@ -692,7 +741,7 @@ function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, o
     const initials = newForm.name.split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
     const newUser = {
       id: newId, email: newForm.email, password: newForm.password,
-      role: "student", name: newForm.name, avatar: initials,
+      role: "student", name: newForm.name, avatar: initials, plan: newForm.plan,
       status: "active", createdAt: new Date().toLocaleDateString("pt-BR"),
     };
     const emptyData = {
@@ -706,9 +755,9 @@ function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, o
     onUsersChange([...users, newUser]);
     onStudentsDataChange({ ...studentsData, [newId]: emptyData });
     setNewModal(false);
-    setNewForm({ name: "", email: "", password: "", goal: "Perder gordura" });
+    setNewForm({ name: "", email: "", password: "", goal: "Perder gordura", plan: DEFAULT_PLAN });
     setFormErrors({});
-    toast(`Aluno ${newForm.name} criado!`);
+    toast(`Aluno ${newForm.name} criado no plano ${getPlan(newForm.plan)?.name}!`);
   }
 
    async function handleDelete(student) {
@@ -728,6 +777,7 @@ function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, o
       name: student.name,
       email: student.email,
       password: student.password,
+      plan: student.plan || "",
       goal: sd?.goal || "",
       coachNote: sd?.coachNote || "",
       startWeight: sd?.startWeight ?? 0,
@@ -745,7 +795,7 @@ function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, o
     }
     onUsersChange(users.map(u =>
       u.id === editModal
-        ? { ...u, name: editForm.name, email: editForm.email, password: editForm.password }
+        ? { ...u, name: editForm.name, email: editForm.email, password: editForm.password, ...(editForm.plan ? { plan: editForm.plan } : {}) }
         : u
     ));
     onStudentsDataChange({
@@ -765,10 +815,10 @@ function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, o
   }
 
   function exportCSV() {
-    const rows = [["Nome", "Email", "Objetivo", "Streak", "Treinos/Mês", "Peso Atual", "Status"]];
+    const rows = [["Nome", "Email", "Plano", "Objetivo", "Streak", "Treinos/Mês", "Peso Atual", "Status"]];
     students.forEach(s => {
       const sd = studentsData[s.id];
-      rows.push([s.name, s.email, sd?.goal || "", String(sd?.streak || 0), String(sd?.monthlyWorkouts || 0), String(sd?.currentWeight || 0), s.status]);
+      rows.push([s.name, s.email, getPlan(s.plan)?.name || "", sd?.goal || "", String(sd?.streak || 0), String(sd?.monthlyWorkouts || 0), String(sd?.currentWeight || 0), s.status]);
     });
     const csv = rows.map(r => r.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -821,7 +871,9 @@ function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, o
               onKeyDown={e => e.key === "Enter" && setSelected(isSelected ? null : student.id)}>
               <Avatar initials={student.avatar} size={38} />
               <div style={{ flex: 1, marginLeft: 12, minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{student.name}</div>
+                <div style={{ fontSize: 13, fontWeight: 600, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  {student.name} <PlanBadge plan={student.plan} />
+                </div>
                 <div style={{ fontSize: 11, color: MUTED, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{student.email}</div>
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
@@ -891,6 +943,10 @@ function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, o
             {formErrors[f.key] && <div style={{ fontSize: 12, color: DANGER, marginTop: 4 }}>{formErrors[f.key]}</div>}
           </div>
         ))}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Plano</label>
+          <PlanPicker value={newForm.plan} onChange={plan => setNewForm(p => ({ ...p, plan }))} />
+        </div>
         <div style={{ marginBottom: 20 }}>
           <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Objetivo</label>
           <select value={newForm.goal} onChange={e => setNewForm(p => ({ ...p, goal: e.target.value }))} style={fieldStyle()}>
@@ -916,6 +972,10 @@ function TabAlunos({ users, studentsData, onUsersChange, onStudentsDataChange, o
               style={fieldStyle()} />
           </div>
         ))}
+        <div style={{ marginBottom: 14 }}>
+          <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Plano</label>
+          <PlanPicker value={editForm.plan || ""} onChange={plan => setEditForm(p => ({ ...p, plan }))} />
+        </div>
         <div style={{ marginBottom: 14 }}>
           <label style={{ display: "block", fontSize: 11, fontWeight: 700, color: MUTED, textTransform: "uppercase", letterSpacing: ".06em", marginBottom: 6 }}>Objetivo</label>
           <select value={editForm.goal || ""} onChange={e => setEditForm(p => ({ ...p, goal: e.target.value }))} style={fieldStyle()}>

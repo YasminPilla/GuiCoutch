@@ -1,6 +1,7 @@
 /* eslint-disable prettier/prettier */
 import { motion } from "framer-motion";
 import { Check, X, Star, MessageCircle } from "lucide-react";
+import { PLANS } from "@/lib/plans";
 
 const WHATSAPP = "5511959222489";
 
@@ -8,53 +9,7 @@ function planMessage(name: string, price: string): string {
   return encodeURIComponent(`Olá, Guilherme! Quero saber mais sobre o plano ${name} (R$ ${price}/mês).`);
 }
 
-const plans = [
-  {
-    key: "starter",
-    name: "Starter",
-    price: "39,90",
-    tagline: "Comece sem desculpa",
-    color: "#f87171",
-    popular: false,
-    items: [
-      { label: "Acesso à plataforma", ok: true },
-      { label: "Treino personalizado (casa ou academia)", ok: true },
-      { label: "Suporte via plataforma (respostas em 24h)", ok: true },
-      { label: "Acompanhamento mensal", ok: true },
-      { label: "Fotos e registro de progresso", ok: false },
-    ],
-  },
-  {
-    key: "plus",
-    name: "Plus",
-    price: "89,90",
-    tagline: "O mais escolhido",
-    color: "#E10600",
-    popular: true,
-    items: [
-      { label: "Acesso à plataforma", ok: true },
-      { label: "Treino personalizado com periodização", ok: true },
-      { label: "Suporte prioritário (respostas em 24h)", ok: true },
-      { label: "Acompanhamento quinzenal", ok: true },
-      { label: "Fotos e registro de progresso", ok: true },
-    ],
-  },
-  {
-    key: "premium",
-    name: "Premium",
-    price: "179,90",
-    tagline: "Máxima atenção e resultado",
-    color: "#facc15",
-    popular: false,
-    items: [
-      { label: "Acesso à plataforma", ok: true },
-      { label: "Treino personalizado com periodização", ok: true },
-      { label: "Suporte VIP (respostas em 24h)", ok: true },
-      { label: "Acompanhamento semanal (check-in)", ok: true },
-      { label: "Relatório mensal de progresso", ok: true },
-    ],
-  },
-];
+const plans = PLANS;
 
 const tableRows = [
   { label: "Preço/mês", starter: "R$ 39,90", plus: "R$ 89,90", premium: "R$ 179,90", type: "text" as const },
