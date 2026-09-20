@@ -12,6 +12,8 @@ import {
 import appCss from "../styles.css?url";
 import { SITE_URL, SITE_NAME } from "../lib/seo";
 
+const GA_ID = "G-NJNKHB3PXL";
+
 const personJsonLd = {
   "@context": "https://schema.org",
   "@type": "Person",
@@ -175,6 +177,15 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         { rel: "icon", type: "image/png", sizes: "192x192", href: "/logo_red_192.png" },
         { rel: "apple-touch-icon", sizes: "180x180", href: "/logo_red_180.png" },
         { rel: "manifest", href: "/site.webmanifest" },
+      ],
+      scripts: [
+        { src: `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`, async: true },
+        {
+          children: `window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+gtag('js', new Date());
+gtag('config', '${GA_ID}');`,
+        },
       ],
     };
   },
