@@ -30,7 +30,7 @@ Valores disponíveis no site, também sujeitos a atualização.
 
 ## Páginas
 
-- [Site principal](https://gc-guicoach.vercel.app/): apresentação, planos, produtos, como funciona, resultados de alunos e contato.
+- [Site principal](https://www.guilhermetreinador.com.br/): apresentação, planos, produtos, como funciona, resultados de alunos e contato.
 
 ## Contato
 

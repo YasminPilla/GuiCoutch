@@ -145,7 +145,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         { property: "og:title", content: SITE_NAME },
         { property: "og:description", content: description },
         { property: "og:type", content: "website" },
-        { property: "og:url", content: SITE_URL },
+        { property: "og:url", content: `${SITE_URL}/` },
         { property: "og:site_name", content: SITE_NAME },
         { property: "og:locale", content: "pt_BR" },
         { property: "og:image", content: ogImage },
@@ -163,7 +163,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         { "script:ld+json": personJsonLd },
       ],
       links: [
-        { rel: "canonical", href: SITE_URL },
+        { rel: "canonical", href: `${SITE_URL}/` },
         { rel: "preconnect", href: "https://fonts.googleapis.com" },
         { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
         {
