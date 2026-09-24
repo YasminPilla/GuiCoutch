@@ -1,7 +1,7 @@
 /* eslint-disable prettier/prettier */
 import { motion } from "framer-motion";
 import { Check, X, Star, MessageCircle } from "lucide-react";
-import { PLANS } from "@/lib/plans";
+import { PUBLIC_PLANS } from "@/lib/plans";
 
 const WHATSAPP = "5511959222489";
 
@@ -9,7 +9,7 @@ function planMessage(name: string, price: string): string {
   return encodeURIComponent(`Olá, Guilherme! Quero saber mais sobre o plano ${name} (R$ ${price}/mês).`);
 }
 
-const plans = PLANS;
+const plans = PUBLIC_PLANS;
 
 const tableRows = [
   { label: "Preço/mês", starter: "R$ 39,90", plus: "R$ 89,90", premium: "R$ 179,90", type: "text" as const },
@@ -148,7 +148,7 @@ export function Plans() {
 
               {/* CTA — chama direto no WhatsApp */}
               <a
-                href={`https://wa.me/${WHATSAPP}?text=${planMessage(plan.name, plan.price)}`}
+                href={`https://wa.me/${WHATSAPP}?text=${planMessage(plan.name, plan.price ?? "")}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 style={{

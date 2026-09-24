@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 
 import { formatWeight, parseWeightKg } from "@/lib/workout-log";
-import { PLANS, DEFAULT_PLAN, getPlan } from "@/lib/plans";
+import { PLANS, DEFAULT_PLAN, getPlan, formatPlanPrice } from "@/lib/plans";
 
 import {
   useAdminProps,
@@ -279,7 +279,6 @@ function PlanPicker({ value, onChange }) {
     <div style={{ display: "grid", gap: 8 }}>
       {PLANS.map(p => {
         const active = value === p.key;
-        const freq = p.items.find(i => i.label.startsWith("Acompanhamento"))?.label;
         return (
           <button type="button" key={p.key} onClick={() => onChange(p.key)} aria-pressed={active}
             style={{
@@ -299,9 +298,11 @@ function PlanPicker({ value, onChange }) {
               <span style={{ display: "block", fontSize: 13, fontWeight: 700, color: active ? p.color : "#f0f0f0" }}>
                 {p.name}{p.popular ? " · mais popular" : ""}
               </span>
-              <span style={{ display: "block", fontSize: 11, color: MUTED, marginTop: 2 }}>{freq}</span>
+              <span style={{ display: "block", fontSize: 11, color: MUTED, marginTop: 2 }}>{p.summary}</span>
             </span>
-            <span style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>R$ {p.price}<span style={{ fontSize: 10, fontWeight: 400, color: MUTED }}>/mês</span></span>
+            {p.price && !p.free
+              ? <span style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>R$ {p.price}<span style={{ fontSize: 10, fontWeight: 400, color: MUTED }}>/mês</span></span>
+              : <span style={{ fontSize: 12, fontWeight: 700, whiteSpace: "nowrap", color: p.free ? p.color : MUTED }}>{formatPlanPrice(p)}</span>}
           </button>
         );
       })}

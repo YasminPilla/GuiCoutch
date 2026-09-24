@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 // ─── Firebase ─────────────────────────────────────────────────────────────
 import { db } from "@/components/site/firebase";
+import type { PlanKey } from "@/lib/plans";
 import {
   collection, doc, getDoc, getDocs, setDoc, updateDoc, deleteDoc, onSnapshot,
   writeBatch, query, orderBy, limit,
@@ -25,7 +26,7 @@ export interface User {
   status: "active" | "inactive";
   createdAt: string;
   authUid?: string;
-  plan?: "starter" | "plus" | "premium";
+  plan?: PlanKey;
 }
 
 export interface Exercise {
@@ -1027,6 +1028,8 @@ export function useStudentProps(studentId: number) {
   const sd  = ctx.studentsData[studentId];
   return {
     sharedStudentData:   sd,
+    // plano atual (ao vivo — o user salvo no login pode estar desatualizado)
+    myPlan:              ctx.users.find(u => u.id === studentId)?.plan,
     exerciseLibrary:     ctx.exerciseLibrary,           // ── NOVO: aluno pode ver a biblioteca ──
     workoutGuidelines:   ctx.workoutGuidelines,         // ── NOVO: orientações gerais de treino ──
     // ── NOVO: pesquisas destinadas a este aluno + respostas já enviadas ──

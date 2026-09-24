@@ -47,6 +47,10 @@ import {
   findInvalidDone,
   formatWeight,
 } from "@/lib/workout-log";
+import { hasTracking } from "@/lib/plans";
+import {
+  formatSessionDate, formatSessionText, sessionFileName, loadLocalSessions, saveLocalSessions,
+} from "@/lib/workout-export";
 
 // ─── CONSTANTES ───────────────────────────────────────────────────────────
 const N      = "#00FF88";
@@ -510,7 +514,105 @@ function WorkoutGuidelinesCard({ text }: { text: string }) {
 }
 
 // ─── TAB: TREINOS ─────────────────────────────────────────────────────────
-function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent, extraSessions = [], inProgressWorkout = null, workoutGuidelines = "" }: any) {
+// ─── PLANO "SOMENTE TREINO" ───────────────────────────────────────────────
+// Sem acompanhamento: os treinos concluídos ficam só neste aparelho e o aluno
+// exporta cada um (com anotações) em texto.
+function downloadSessionText(session: any, studentName?: string) {
+  const blob = new Blob([formatSessionText(session, studentName)], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = sessionFileName(session);
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function LocalOnlyCard({ accent, sessions = [], onExport }: any) {
+  const color = accent || N;
+  const recent = [...sessions]
+    .sort((a: any, b: any) => parseLocalDate(b.date).getTime() - parseLocalDate(a.date).getTime())
+    .slice(0, 5);
+  return (
+    <div className="card" style={{ marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+        <Info size={18} style={{ color: BLUE, flexShrink: 0, marginTop: 2 }} />
+        <div style={{ fontSize: "0.86em", color: "var(--muted)", lineHeight: 1.5 }}>
+          <strong style={{ color: "inherit" }}>Plano Somente treino.</strong> Seus registros ficam salvos só neste aparelho,
+          sem acompanhamento do coach. Ao concluir um treino, exporte para guardar suas cargas e anotações.
+        </div>
+      </div>
+      {recent.length > 0 && (
+        <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 6 }}>
+          {recent.map((s: any) => (
+            <div key={s.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "8px 12px", borderRadius: 10, background: "rgba(255,255,255,0.03)" }}>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: "0.93em", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.workoutName}</div>
+                <div style={{ fontSize: "0.79em", color: "var(--muted)" }}>{formatSessionDate(s.date)} · {s.exercises?.length || 0} exercícios</div>
+              </div>
+              <button onClick={() => onExport?.(s)}
+                style={{ display: "flex", alignItems: "center", gap: 6, background: "none", border: `1px solid ${color}55`, color, borderRadius: 100, padding: "6px 12px", fontSize: "0.79em", fontWeight: 700, cursor: "pointer", flexShrink: 0 }}>
+                <Download size={13} /> Exportar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExportSessionModal({ session, studentName, accent, onClose }: any) {
+  const color = accent || N;
+  const [copied, setCopied] = useState(false);
+  const text = formatSessionText(session, studentName);
+  const canShare = typeof navigator !== "undefined" && typeof navigator.share === "function";
+
+  async function handleCopy() {
+    try { await navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); } catch {}
+  }
+  async function handleShare() {
+    try { await navigator.share({ title: `Treino ${session.workoutName}`, text }); } catch {}
+  }
+
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+      style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.88)", display: "flex", alignItems: "flex-end", justifyContent: "center", zIndex: 1000, padding: 16, backdropFilter: "blur(3px)" }}
+      onClick={onClose}>
+      <motion.div initial={{ y: 60, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 60, opacity: 0 }}
+        className="card" style={{ maxWidth: 600, maxHeight: "85vh", overflowY: "auto", width: "100%", borderRadius: "20px 20px 0 0" }}
+        onClick={e => e.stopPropagation()}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+          <h3 className="display" style={{ fontSize: "1.29em", fontWeight: 700, display: "flex", alignItems: "center", gap: 8 }}>
+            <CheckCircle2 size={20} style={{ color }} /> Treino concluído
+          </h3>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer" }}><X size={20} /></button>
+        </div>
+        <p style={{ fontSize: "0.86em", color: "var(--muted)", margin: "0 0 14px" }}>
+          Salvo neste aparelho. Exporte para guardar suas cargas e anotações.
+        </p>
+        <pre style={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: "inherit", fontSize: "0.86em", lineHeight: 1.55, background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", borderRadius: 12, padding: 14, margin: "0 0 16px" }}>
+          {text}
+        </pre>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <NeonBtn accent={accent} onClick={() => downloadSessionText(session, studentName)} style={{ flex: 1, justifyContent: "center", minWidth: 140 }}>
+            <Download size={16} /> Baixar
+          </NeonBtn>
+          {canShare ? (
+            <NeonBtn accent={accent} secondary onClick={handleShare} style={{ flex: 1, justifyContent: "center", minWidth: 140 }}>
+              <Share2 size={16} /> Compartilhar
+            </NeonBtn>
+          ) : (
+            <NeonBtn accent={accent} secondary onClick={handleCopy} style={{ flex: 1, justifyContent: "center", minWidth: 140 }}>
+              <FileText size={16} /> {copied ? "Copiado!" : "Copiar texto"}
+            </NeonBtn>
+          )}
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent, extraSessions = [], inProgressWorkout = null, workoutGuidelines = "", localOnly = false, onExportSession }: any) {
   const [expandedWorkout, setExpandedWorkout] = useState<number | null>(null);
   const workouts = sd?.workouts || [];
 
@@ -579,6 +681,8 @@ function WorkoutTab({ sd, onStartWorkout, onAdaptiveWorkout, accent, extraSessio
       </div>
 
       <WorkoutGuidelinesCard text={workoutGuidelines} />
+
+      {localOnly && <LocalOnlyCard accent={accent} sessions={extraSessions} onExport={onExportSession} />}
 
       {sd?.coachNote && (
         <div className="card" style={{ marginBottom: 20, background: `${accent || N}08`, borderColor: `${accent || N}22` }}>
@@ -2531,6 +2635,8 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
   // ── FIX RELATÓRIOS: cache local das sessões salvas nesta sessão ──────────
   // Evita depender do snapshot do Firestore para mostrar o treino imediatamente
   const [localSessions, setLocalSessions] = useState<WorkoutSession[]>([]);
+  // Plano "Somente treino": sessão concluída aberta para exportar
+  const [exportSession, setExportSession] = useState<WorkoutSession | null>(null);
 
   // ── Cache do treino em andamento: se o aluno fechar o modal ou o navegador,
   // o progresso (exercício atual, séries/reps/peso digitados, concluídos/pulados)
@@ -2585,9 +2691,17 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
     onResubmitPhoto,
     onAddWorkoutSession,
     onSubmitSurveyResponse,
+    myPlan,
   } = useStudentProps(user.id);
 
   const sd = sharedStudentData ?? null;
+  // false = plano "Somente treino": nada vai pro Firestore, sessões ficam no localStorage
+  const tracking = hasTracking(myPlan ?? user.plan);
+
+  // Somente treino: carrega as sessões concluídas salvas neste aparelho
+  useEffect(() => {
+    if (!tracking) setLocalSessions(loadLocalSessions<WorkoutSession>(user.id));
+  }, [tracking, user.id]);
 
   useEffect(() => { saveSettings(settings); }, [settings]);
 
@@ -2634,9 +2748,15 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
   // ── FIX: salva localmente + no Firestore ─────────────────────────────────
   function handleSaveSession(session: WorkoutSession) {
     // 1. Adiciona ao cache local imediatamente (relatórios aparecem na hora)
-    setLocalSessions(prev => [session, ...prev]);
-    // 2. Persiste no Firestore via SharedAppState
-    onAddWorkoutSession(session);
+    setLocalSessions(prev => {
+      const next = [session, ...prev];
+      if (!tracking) saveLocalSessions(user.id, next);
+      return next;
+    });
+    // 2. Persiste no Firestore via SharedAppState — ou, sem acompanhamento,
+    //    fica só no aparelho e abre a exportação
+    if (tracking) onAddWorkoutSession(session);
+    else setExportSession(session);
     // 3. Fecha o modal e limpa o cache do treino em andamento
     setShowWorkoutModal(false);
     setHasUnsavedWorkout(false);
@@ -2644,7 +2764,7 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
     try { localStorage.removeItem(activeWorkoutKey); } catch {}
   }
 
-  const pendingSurveysCount = (mySurveys || []).filter(
+  const pendingSurveysCount = !tracking ? 0 : (mySurveys || []).filter(
     (s: any) => !(mySurveyResponses || []).some((r: any) => r.surveyId === s.id)
   ).length;
   const [surveyBannerDismissed, setSurveyBannerDismissed] = useState(false);
@@ -2655,7 +2775,7 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
     { id: "fotos",     label: "Progresso",  icon: Camera },
     { id: "pesquisas", label: "Pesquisas",  icon: ClipboardList, badge: pendingSurveysCount },
     { id: "config",    label: "Config",     icon: Settings },
-  ];
+  ].filter(t => tracking || t.id === "treino" || t.id === "config");
 
   if (sharedStudentData === undefined) {
     return (
@@ -2754,6 +2874,8 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
                 doneCount: workoutDoneStatus.filter(Boolean).length,
                 totalCount: workoutDoneStatus.length,
               } : null}
+              localOnly={!tracking}
+              onExportSession={setExportSession}
               onStartWorkout={handleStartWorkout}
               onAdaptiveWorkout={(w: any) => { setSelectedWorkout(w); setShowAdaptiveModal(true); }} />
           )}
@@ -2801,6 +2923,14 @@ export function StudentDashboard({ user, onLogout }: { user: any; onLogout: () =
             onClose={() => setShowWorkoutModal(false)}
             onSave={handleSaveSession}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Somente treino: exportar treino concluído */}
+      <AnimatePresence>
+        {exportSession && (
+          <ExportSessionModal session={exportSession} studentName={user.name} accent={accent}
+            onClose={() => setExportSession(null)} />
         )}
       </AnimatePresence>
     </div>
