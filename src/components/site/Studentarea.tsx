@@ -51,6 +51,8 @@ import { hasTracking } from "@/lib/plans";
 import {
   formatSessionDate, formatSessionText, sessionFileName, loadLocalSessions, saveLocalSessions,
 } from "@/lib/workout-export";
+import { findExerciseDemo } from "@/lib/exercise-demos";
+import { ExerciseDemoModal } from "@/components/site/ExerciseDemo";
 
 // ─── CONSTANTES ───────────────────────────────────────────────────────────
 const N      = "#00FF88";
@@ -1902,6 +1904,7 @@ export function WorkoutCarouselModal({
   const [showFeedback,  setShowFeedback]  = useState(false);
   const [showExList,    setShowExList]    = useState(false);
   const [showNoteModal, setShowNoteModal] = useState(false);
+  const [showDemo,      setShowDemo]      = useState(false);
   // índice do exercício em que o aluno tentou concluir/salvar — só então os erros aparecem
   const [attemptedIdx,  setAttemptedIdx]  = useState<number | null>(null);
   // ação (navegar/fechar/resumo) aguardando o aluno decidir o que fazer com alterações não salvas
@@ -1929,6 +1932,13 @@ export function WorkoutCarouselModal({
   const currentPlannedEx = useMemo(
     () => (workout.exercises || []).find((e: any) => e.id === log?.exerciseId),
     [workout.exercises, log?.exerciseId]
+  );
+
+  // desenho animado do exercício atual — null se não houver no catálogo
+  const currentDemo = useMemo(
+    () => findExerciseDemo(currentPlannedEx?.name || log?.exerciseName || "",
+      currentPlannedEx?.equipment || resolveEquipment(currentPlannedEx?.name || log?.exerciseName, exerciseLibrary)),
+    [currentPlannedEx, log?.exerciseName, exerciseLibrary]
   );
 
   // ── opções de carga sugeridas para o exercício atual. Prioriza o
@@ -2252,14 +2262,26 @@ export function WorkoutCarouselModal({
                           <Dumbbell size={13} /> Equipamento: {currentPlannedEx.equipment}
                         </div>
                       )}
-                      {/* ── Observação do exercício: abre modal com explicação + vídeo ── */}
-                      {(currentPlannedEx?.note || currentPlannedEx?.videoUrl) && (
-                        <button type="button" onClick={() => setShowNoteModal(true)}
-                          style={{ fontSize: "0.86em", color, marginTop: 4, display: "flex", alignItems: "center", gap: 6,
-                            fontWeight: 600, background: "none", border: "none", padding: 0, cursor: "pointer",
-                            textDecoration: "underline", width: "fit-content", fontFamily: "inherit" }}>
-                          💡 Observação
-                        </button>
+                      {/* ── Exemplo (demonstração visual) + Observação (explicação + vídeo do coach) ── */}
+                      {(currentDemo || currentPlannedEx?.note || currentPlannedEx?.videoUrl) && (
+                        <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, marginTop: 6 }}>
+                          {currentDemo && (
+                            <button type="button" onClick={() => setShowDemo(true)}
+                              style={{ fontSize: "0.86em", color: "#000", background: color, display: "flex", alignItems: "center", gap: 6,
+                                fontWeight: 700, border: "none", borderRadius: 999, padding: "6px 12px", cursor: "pointer",
+                                fontFamily: "inherit", minHeight: 32 }}>
+                              <Play size={13} fill="currentColor" /> Exemplo
+                            </button>
+                          )}
+                          {(currentPlannedEx?.note || currentPlannedEx?.videoUrl) && (
+                            <button type="button" onClick={() => setShowNoteModal(true)}
+                              style={{ fontSize: "0.86em", color, display: "flex", alignItems: "center", gap: 6,
+                                fontWeight: 600, background: "none", border: "none", padding: 0, cursor: "pointer",
+                                textDecoration: "underline", width: "fit-content", fontFamily: "inherit" }}>
+                              💡 Observação
+                            </button>
+                          )}
+                        </div>
                       )}
                       {isDone && (
                         <div style={{ fontSize: "0.86em", color, marginTop: 4, display: "flex", alignItems: "center", gap: 4 }}>
@@ -2552,6 +2574,20 @@ export function WorkoutCarouselModal({
             </div>
           </motion.div>
         </motion.div>
+      )}
+    </AnimatePresence>
+
+    {/* ── Modal de Exemplo: demonstração visual leve do exercício ── */}
+    <AnimatePresence>
+      {showDemo && currentDemo && (
+        <ExerciseDemoModal
+          demo={currentDemo}
+          title={currentPlannedEx?.name || log?.exerciseName}
+          note={currentPlannedEx?.note}
+          accent={color}
+          isDark={isDark}
+          onClose={() => setShowDemo(false)}
+        />
       )}
     </AnimatePresence>
 

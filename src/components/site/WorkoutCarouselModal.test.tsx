@@ -403,3 +403,30 @@ describe("WorkoutCarouselModal — salvar treino", () => {
     expect(weight()).toHaveAttribute("aria-invalid", "true");
   });
 });
+
+describe("WorkoutCarouselModal — exemplo do exercício", () => {
+  it("botão Exemplo abre o desenho animado do exercício atual com passo a passo", async () => {
+    const user = userEvent.setup();
+    render(<Harness />);
+    await user.click(screen.getByRole("button", { name: /Exemplo/ }));
+
+    const dialog = screen.getByRole("dialog", { name: /Exemplo: Supino Reto/ });
+    expect(
+      within(dialog).getByRole("img", { name: /Desenho animado: Supino Reto/ }),
+    ).toBeInTheDocument();
+    expect(within(dialog).getByText("Peitoral")).toBeInTheDocument();
+    expect(within(dialog).getAllByRole("listitem").length).toBeGreaterThan(0);
+
+    await user.click(within(dialog).getByRole("button", { name: "Fechar exemplo" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("não mostra o botão quando o exercício não está no catálogo", () => {
+    const logs = createInitialLogs(
+      [{ ...exercises[0], id: "x", name: "Corrida na esteira", equipment: "" }],
+      90,
+    );
+    render(<Harness logs={logs} />);
+    expect(screen.queryByRole("button", { name: /Exemplo/ })).not.toBeInTheDocument();
+  });
+});
